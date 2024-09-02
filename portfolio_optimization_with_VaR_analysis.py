@@ -65,6 +65,7 @@ print("Total Benefit:", pulp.value(model.objective))
 
 # Financial Instruments Used
 print("\nFinancial Instruments Used:")
+print (y)
 for instrument in financial_instruments:
     if y[instrument].varValue > 0:
         print(f"- {instrument}: Amount Used = {y[instrument].varValue}, Interest Rate = {interest_rates[financial_instruments.index(instrument)]}")
