@@ -13,8 +13,8 @@ financial_instruments = ['Loan', 'Bond', 'Equity']
 interest_rates = [0.05, 0.03, 0.08]  # Cost of loans, bonds, and equity (returns)
 
 # Budget and risk parameters
-B = 4500000  # Total available budget
-mu = 1000000  # Maximum acceptable risk level
+B = 6000000  # Total available budget
+mu = 1500000  # Maximum acceptable risk level
 lambda_param = 0.5  # Risk aversion parameter
 num_simulations = 10000  # Number of simulations for VaR analysis
 
@@ -35,8 +35,9 @@ expected_losses = [default_probabilities[j] * loss_given_default[j] * B for j in
 # Risk contribution from financial instruments
 risk_contribution = np.sum(expected_losses)
 
-# Define the objective function
-model += pulp.lpSum([AHP_weights[i] * benefits[i] * x[projects[i]] for i in range(len(projects))]), "Total_Benefit"
+# Define the objective function with a penalty for not using financial instruments
+model += pulp.lpSum([AHP_weights[i] * benefits[i] * x[projects[i]] for i in range(len(projects))]) - \
+           (0.01 * (y['Loan'] + y['Bond'] + y['Equity'])), "Total_Benefit"
 
 # Define constraints
 # Budget constraint
@@ -51,6 +52,11 @@ model += (pulp.lpSum([risk_adjusted_costs[i] * x[projects[i]] for i in range(len
             risk_contribution <= mu, 
             "Total_Risk_Constraint")
 
+# Minimum financing requirement
+model += (y['Loan'] >= 100000, "Min_Loan_Requirement")
+model += (y['Bond'] >= 100000, "Min_Bond_Requirement")
+model += (y['Equity'] >= 100000, "Min_Equity_Requirement")
+
 # Solve the problem
 model.solve()
 
@@ -63,12 +69,20 @@ for project in projects:
 
 print("Total Benefit:", pulp.value(model.objective))
 
+# Check if any projects were selected
+if sum(x[project].varValue for project in projects) == 0:
+    print("No projects selected.")
+
 # Financial Instruments Used
-print("\nFinancial Instruments Used:")
-print (y)
+print("\nDecision Variables for Financial Instruments:")
 for instrument in financial_instruments:
-    if y[instrument].varValue > 0:
-        print(f"- {instrument}: Amount Used = {y[instrument].varValue}, Interest Rate = {interest_rates[financial_instruments.index(instrument)]}")
+    print(f"{instrument}: {y[instrument].varValue}")
+
+for instrument, rate in zip(financial_instruments, interest_rates):
+    amount_used = y[instrument].varValue
+    if amount_used > 0:
+        print(f"- {instrument}: Amount Used = {amount_used:.2f}, Interest Rate = {rate:.1%}")
+
 
 # VaR Analysis
 # Simulate interest rate changes and calculate impact on cash flows
