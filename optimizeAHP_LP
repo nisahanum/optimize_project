@@ -1,2 +1,24 @@
 import numpy as np
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, LpStatus
+
+# Define Projects Data
+projects = {
+    "Project A": {
+        "base_cost": 100000,
+        "financing_cost": 12000,
+        "risk_adjustment": 0.10,
+        "AHP_score": 0.5
+    },
+    "Project B": {
+        "base_cost": 150000,
+        "financing_cost": 18000,
+        "risk_adjustment": 0.15,
+        "AHP_score": 0.3
+    },
+    "Project C": {
+        "base_cost": 80000,
+        "financing_cost": 6000,
+        "risk_adjustment": 0.05,
+        "AHP_score": 0.2
+    }
+}
