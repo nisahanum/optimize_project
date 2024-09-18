@@ -1,6 +1,9 @@
+import matplotlib.pyplot as plt
+
 # Risk adjustments and AHP scores
 risk_adjustments = [0.10, 0.15, 0.05]
 AHP_scores = [0.5, 0.3, 0.2]
+project_names = ['Project A', 'Project B', 'Project C']
 
 # Create a scatter plot
 plt.figure(figsize=(8, 5))
