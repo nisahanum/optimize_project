@@ -118,3 +118,66 @@ for project, cost in total_costs.items():
 print(f"\nOptimization Status: {status}")
 print(f"Selected Projects: {selected_projects}")
 print(f"Total AHP Score of Selected Projects: {total_benefit:.4f}")
+
+#VISUALITATION
+import matplotlib.pyplot as plt
+
+# Extracting data for visualization
+projects_list = list(projects.keys())
+financing_instruments = [selected_instruments[project] for project in projects_list]
+total_cost_values = total_costs.values()
+
+# Create a bar chart
+plt.figure(figsize=(10, 6))
+bar_width = 0.4
+x = range(len(projects_list))
+
+plt.bar(x, total_cost_values, width=bar_width, color='lightblue', label='Total Cost')
+plt.xticks(x, projects_list)
+plt.title('Total Costs by Project and Selected Financing Instrument')
+plt.xlabel('Projects')
+plt.ylabel('Total Cost ($)')
+plt.grid(axis='y')
+plt.legend()
+plt.show()
+
+# Pie Chart of Selected Financial Instruments
+# Count the frequency of selected financing instruments
+instrument_counts = {}
+for project in selected_instruments.values():
+    instrument_counts[project] = instrument_counts.get(project, 0) + 1
+
+# Create a pie chart
+plt.figure(figsize=(8, 8))
+plt.pie(instrument_counts.values(), labels=instrument_counts.keys(), autopct='%1.1f%%', startangle=140, colors=['lightgreen', 'lightcoral', 'lightskyblue'])
+plt.title('Distribution of Selected Financial Instruments')
+plt.axis('equal')  # Equal aspect ratio ensures that pie chart is a circle.
+plt.show()
+
+# Line Chart of Project Costs with Different Financing Options
+# Prepare data for line chart
+financing_options = list(projects[list(projects.keys())[0]]["financing_costs"].keys())
+financing_costs = {option: [] for option in financing_options}
+
+for project in projects.keys():
+    base_cost = projects[project]["base_cost"]
+    for option in financing_options:
+        financing_percentage = projects[project]["financing_costs"][option]
+        financing_cost = base_cost * financing_percentage
+        risk_adjustment = base_cost * projects[project]["risk_adjustment"]
+
+        total_cost = base_cost + financing_cost + risk_adjustment
+        financing_costs[option].append(total_cost)
+
+# Create a line chart
+plt.figure(figsize=(12, 6))
+for option in financing_options:
+    plt.plot(projects_list, financing_costs[option], marker='o', label=option)
+
+plt.title('Project Costs with Different Financing Options')
+plt.xlabel('Projects')
+plt.ylabel('Total Cost ($)')
+plt.xticks(projects_list)
+plt.legend()
+plt.grid()
+plt.show()
