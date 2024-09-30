@@ -34,7 +34,9 @@ def monte_carlo_simulation(num_simulations, cost_of_equity_mean, cost_of_debt_me
     rbf_wacc = []
     
     total_wacc_values = []
-    npv_values = []
+    npv_values_equity = []
+    npv_values_debt = []
+    npv_values_rbf = []
     
     for _ in range(num_simulations):
         # Generate random samples for each parameter from their respective distributions
@@ -68,17 +70,23 @@ def monte_carlo_simulation(num_simulations, cost_of_equity_mean, cost_of_debt_me
         total_wacc = equity_contribution + debt_contribution + rbf_contribution
         total_wacc_values.append(total_wacc)
 
-        # Assuming NPV calculation with a discount rate of WACC and constant cash flow
+        # NPV calculation with a discount rate of WACC and constant cash flow
         cash_flow = 1000000  # Example cash flow in currency
         project_life = 10    # Project life in years
-        npv = np.sum([cash_flow / (1 + total_wacc)**t for t in range(1, project_life + 1)])
-        npv_values.append(npv)
+        
+        npv_equity = np.sum([cash_flow / (1 + equity_contribution)**t for t in range(1, project_life + 1)])
+        npv_debt = np.sum([cash_flow / (1 + debt_contribution)**t for t in range(1, project_life + 1)])
+        npv_rbf = np.sum([cash_flow / (1 + rbf_contribution)**t for t in range(1, project_life + 1)])
+        
+        npv_values_equity.append(npv_equity)
+        npv_values_debt.append(npv_debt)
+        npv_values_rbf.append(npv_rbf)
 
-    return total_wacc_values, npv_values, equity_wacc, debt_wacc, rbf_wacc
+    return total_wacc_values, npv_values_equity, npv_values_debt, npv_values_rbf, equity_wacc, debt_wacc, rbf_wacc
 
 # Function to run and plot separate visualizations for each component
 def run_scenario_separate(title, cost_of_equity_mean, cost_of_debt_mean, tax_rate_mean, rbf_cost_mean):
-    total_wacc_simulations, npv_simulations, equity_wacc_simulations, debt_wacc_simulations, rbf_wacc_simulations = monte_carlo_simulation(
+    total_wacc_simulations, npv_equity, npv_debt, npv_rbf, equity_wacc_simulations, debt_wacc_simulations, rbf_wacc_simulations = monte_carlo_simulation(
         num_simulations, cost_of_equity_mean, cost_of_debt_mean, tax_rate_mean, rbf_cost_mean)
 
     # Plot the results for each WACC component
@@ -93,27 +101,35 @@ def run_scenario_separate(title, cost_of_equity_mean, cost_of_debt_mean, tax_rat
     plt.grid(True)
     plt.show()
 
-    # Plot the results for NPV comparison
+    # Plot the results for NPV comparison with different colors
     plt.figure(figsize=(10, 6))
-    plt.hist(npv_simulations, bins=50, alpha=0.7, color='purple', edgecolor='black')
+    plt.hist(npv_equity, bins=50, alpha=0.7, color='blue', edgecolor='black', label='Equity NPV')
+    plt.hist(npv_debt, bins=50, alpha=0.7, color='green', edgecolor='black', label='Debt NPV')
+    plt.hist(npv_rbf, bins=50, alpha=0.7, color='orange', edgecolor='black', label='RBF NPV')
     plt.title(f"NPV Distribution - {title}")
     plt.xlabel('NPV')
     plt.ylabel('Frequency')
+    plt.legend()
     plt.grid(True)
     plt.show()
 
     # Print summary statistics
     mean_wacc = np.mean(total_wacc_simulations)
     std_wacc = np.std(total_wacc_simulations)
-    mean_npv = np.mean(npv_simulations)
-    std_npv = np.std(npv_simulations)
+    mean_npv_equity = np.mean(npv_equity)
+    std_npv_equity = np.std(npv_equity)
+    mean_npv_debt = np.mean(npv_debt)
+    std_npv_debt = np.std(npv_debt)
+    mean_npv_rbf = np.mean(npv_rbf)
+    std_npv_rbf = np.std(npv_rbf)
     
     print(f"Scenario: {title}")
     print(f"Mean WACC: {mean_wacc:.4f}")
     print(f"Standard Deviation of WACC: {std_wacc:.4f}")
-    print(f"Mean NPV: {mean_npv:.2f}")
-    print(f"Standard Deviation of NPV: {std_npv:.2f}")
+    print(f"Mean NPV (Equity): {mean_npv_equity:.2f}, Std Dev: {std_npv_equity:.2f}")
+    print(f"Mean NPV (Debt): {mean_npv_debt:.2f}, Std Dev: {std_npv_debt:.2f}")
+    print(f"Mean NPV (RBF): {mean_npv_rbf:.2f}, Std Dev: {std_npv_rbf:.2f}")
     print("-" * 50)
 
-# Scenario 1: Separate visualization for WACC components and NPV comparison
-run_scenario_separate("Higher RBF Cost with Separate Components", cost_of_equity_mean=0.12, cost_of_debt_mean=0.05, tax_rate_mean=0.30, rbf_cost_mean=0.15)
+# Scenario 1: Separate visualization for WACC components and NPV comparison with different colors
+run_scenario_separate("Debt, Equity and RBF Comparison", cost_of_equity_mean=0.12, cost_of_debt_mean=0.05, tax_rate_mean=0.30, rbf_cost_mean=0.15)
