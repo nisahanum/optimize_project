@@ -29,7 +29,11 @@ rbf_proportion_std = 0.05
 
 # Monte Carlo simulation
 def monte_carlo_simulation(num_simulations):
-    wacc_values = []
+    equity_wacc = []
+    debt_wacc = []
+    rbf_wacc = []
+    
+    total_wacc_values = []
     
     for _ in range(num_simulations):
         # Generate random samples for each parameter from their respective distributions
@@ -49,29 +53,75 @@ def monte_carlo_simulation(num_simulations):
         debt_proportion /= total_proportion
         rbf_proportion /= total_proportion
 
-        # WACC formula: WACC = E/V * re + D/V * rd * (1-T) + RBF/V * r_rbf
-        wacc = (equity_proportion * cost_of_equity) + \
-               (debt_proportion * cost_of_debt * (1 - tax_rate)) + \
-               (rbf_proportion * rbf_cost)
+        # Calculate individual contributions to WACC
+        equity_contribution = equity_proportion * cost_of_equity
+        debt_contribution = debt_proportion * cost_of_debt * (1 - tax_rate)
+        rbf_contribution = rbf_proportion * rbf_cost
 
-        wacc_values.append(wacc)
+        # Append to lists
+        equity_wacc.append(equity_contribution)
+        debt_wacc.append(debt_contribution)
+        rbf_wacc.append(rbf_contribution)
+        
+        # Total WACC formula: WACC = E/V * re + D/V * rd * (1-T) + RBF/V * r_rbf
+        total_wacc = equity_contribution + debt_contribution + rbf_contribution
+        total_wacc_values.append(total_wacc)
 
-    return wacc_values
+    return total_wacc_values, equity_wacc, debt_wacc, rbf_wacc
 
 # Run simulation
-wacc_simulations = monte_carlo_simulation(num_simulations)
+total_wacc_simulations, equity_wacc_simulations, debt_wacc_simulations, rbf_wacc_simulations = monte_carlo_simulation(num_simulations)
 
-# Plot the distribution of WACC values from the Monte Carlo simulation
-plt.hist(wacc_simulations, bins=50, edgecolor='k', alpha=0.7, color='purple')
-plt.title('Monte Carlo Simulation: Impact of Multiple Financing Sources on WACC')
+# Plot the distribution of total WACC values from the Monte Carlo simulation
+plt.figure(figsize=(12, 8))
+
+# Plot Total WACC distribution
+plt.subplot(2, 2, 1)
+plt.hist(total_wacc_simulations, bins=50, edgecolor='k', alpha=0.7, color='purple')
+plt.title('Total WACC')
 plt.xlabel('WACC')
 plt.ylabel('Frequency')
-plt.grid(True)
+
+# Plot Equity Contribution distribution
+plt.subplot(2, 2, 2)
+plt.hist(equity_wacc_simulations, bins=50, edgecolor='k', alpha=0.7, color='blue')
+plt.title('Equity Contribution to WACC')
+plt.xlabel('Equity WACC')
+plt.ylabel('Frequency')
+
+# Plot Debt Contribution distribution
+plt.subplot(2, 2, 3)
+plt.hist(debt_wacc_simulations, bins=50, edgecolor='k', alpha=0.7, color='green')
+plt.title('Debt Contribution to WACC')
+plt.xlabel('Debt WACC')
+plt.ylabel('Frequency')
+
+# Plot RBF Contribution distribution
+plt.subplot(2, 2, 4)
+plt.hist(rbf_wacc_simulations, bins=50, edgecolor='k', alpha=0.7, color='orange')
+plt.title('RBF Contribution to WACC')
+plt.xlabel('RBF WACC')
+plt.ylabel('Frequency')
+
+plt.tight_layout()
 plt.show()
 
 # Summary statistics
-mean_wacc = np.mean(wacc_simulations)
-std_wacc = np.std(wacc_simulations)
+mean_total_wacc = np.mean(total_wacc_simulations)
+std_total_wacc = np.std(total_wacc_simulations)
 
-print(f"Mean WACC: {mean_wacc:.4f}")
-print(f"Standard Deviation of WACC: {std_wacc:.4f}")
+mean_equity_wacc = np.mean(equity_wacc_simulations)
+std_equity_wacc = np.std(equity_wacc_simulations)
+
+mean_debt_wacc = np.mean(debt_wacc_simulations)
+std_debt_wacc = np.std(debt_wacc_simulations)
+
+mean_rbf_wacc = np.mean(rbf_wacc_simulations)
+std_rbf_wacc = np.std(rbf_wacc_simulations)
+
+print(f"Mean Total WACC: {mean_total_wacc:.4f}")
+print(f"Standard Deviation of Total WACC: {std_total_wacc:.4f}")
+
+print(f"Mean Equity WACC: {mean_equity_wacc:.4f}")
+print(f"Mean Debt WACC: {mean_debt_wacc:.4f}")
+print(f"Mean RBF WACC: {mean_rbf_wacc:.4f}")
