@@ -59,12 +59,20 @@ def optimize_projects_and_financing(projects, project_scores, budget, max_risk):
     financing_vars = {f"{project}_{financing}": LpVariable(f"{project}_{financing}", lowBound=0, upBound=1)
                       for project in projects.keys()
                       for financing in projects[project]["financing_costs"].keys()}
+    
+    # Add positive and negative deviation variables to linearize abs()
+    penalty_weight = 0.05  # A small penalty factor for unbalanced financing
+    positive_dev_vars = {}
+    negative_dev_vars = {}
+
+    for project in projects.keys():
+        for financing in projects[project]["financing_costs"].keys():
+            positive_dev_vars[f"{project}_{financing}"] = LpVariable(f"positive_dev_{project}_{financing}", lowBound=0)
+            negative_dev_vars[f"{project}_{financing}"] = LpVariable(f"negative_dev_{project}_{financing}", lowBound=0)
 
     # Objective function: Maximize total AHP scores for selected projects
-    # We will add a soft penalty using absolute differences for using one financing source
-    penalty_weight = 0.05  # A small penalty factor for unbalanced financing
     prob += lpSum([project_scores[project] * project_vars[project]
-                   - penalty_weight * lpSum([abs(financing_vars[f"{project}_{financing}"] - (1/len(projects[project]["financing_costs"])))
+                   - penalty_weight * lpSum([positive_dev_vars[f"{project}_{financing}"] + negative_dev_vars[f"{project}_{financing}"]
                                              for financing in projects[project]["financing_costs"].keys()])
                    for project in projects]), "Total_AHP_Score"
 
@@ -82,6 +90,11 @@ def optimize_projects_and_financing(projects, project_scores, budget, max_risk):
     # Ensure that the sum of financing proportions for each project equals 1 (mixed financing)
     for project in projects.keys():
         prob += lpSum([financing_vars[f"{project}_{financing}"] for financing in projects[project]["financing_costs"].keys()]) == project_vars[project], f"Financing_Proportion_{project}"
+
+    # Add constraints for positive and negative deviation variables
+    for project in projects.keys():
+        for financing in projects[project]["financing_costs"].keys():
+            prob += financing_vars[f"{project}_{financing}"] - (1/len(projects[project]["financing_costs"])) == positive_dev_vars[f"{project}_{financing}"] - negative_dev_vars[f"{project}_{financing}"]
 
     # Solve the problem
     prob.solve()
