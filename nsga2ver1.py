@@ -102,3 +102,16 @@ plt.ylabel("Expected Portfolio Value (Z1)")
 plt.title("Pareto Front from NSGA-II for IFPOM")
 plt.grid()
 plt.show()
+
+#debuging
+z1s = [-ind.fitness.values[0] for ind in final_pop]
+z2s = [ind.fitness.values[1] for ind in final_pop]
+
+sns.scatterplot(x=z2s, y=z1s)
+plt.title("Distribusi Seluruh Populasi Akhir")
+plt.xlabel("Z2 (Risk-Informed Cost)")
+plt.ylabel("Z1 (Expected Value)")
+plt.grid()
+plt.show()
+
+
