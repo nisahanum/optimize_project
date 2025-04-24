@@ -1,27 +1,29 @@
 import random
 import numpy as np
-from deap import base, creator, tools, algorithms
 import matplotlib.pyplot as plt
+from deap import base, creator, tools, algorithms
 
-# Konfigurasi masalah
-NUM_PROJECTS = 10
-max_project_limit = 6
-penalty_weight = 500
+# ----------------------- Konfigurasi Masalah -----------------------
+
+NUM_PROJECTS = 20
+max_project_limit = 10
+penalty_weight = 1000
 
 # Buat struktur fitness dan individual
-creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0))  # Minimize -Z1, Minimize Z2
+creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0))  # -Z1 (maximize), Z2 (minimize)
 creator.create("Individual", list, fitness=creator.FitnessMulti)
 toolbox = base.Toolbox()
 
-# Data dummy proyek dengan variabilitas tinggi
+# Data proyek dengan variabilitas tinggi
 project_data = [{
-    'roi': random.uniform(10, 60),
-    'cost': random.uniform(500, 3000),
-    'synergy': random.uniform(10, 300),
+    'roi': random.uniform(10, 100),
+    'cost': random.uniform(1000, 10000),
+    'synergy': random.uniform(50, 500),
     'risk': random.uniform(0.05, 0.4),
 } for _ in range(NUM_PROJECTS)]
 
-# Inisialisasi individual dengan normalisasi α + β + γ = 1
+# -------------------- Inisialisasi Kromosom ------------------------
+
 def init_individual():
     ind = []
     for _ in range(NUM_PROJECTS):
@@ -36,14 +38,15 @@ def init_individual():
 toolbox.register("individual", tools.initIterate, creator.Individual, init_individual)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-# Fungsi evaluasi
+# --------------------- Fungsi Evaluasi ------------------------------
+
 def evaluate(individual):
     Z1 = 0
     Z2 = 0
     selected_projects = 0
 
     for i in range(NUM_PROJECTS):
-        x = int(round(individual[i*5]))  # ensure binary
+        x = int(round(individual[i*5]))
         a = individual[i*5 + 1]
         b = individual[i*5 + 2]
         c = individual[i*5 + 3]
@@ -61,21 +64,24 @@ def evaluate(individual):
 
         adjusted_cost = max(cost - synergy, 0)
         risk_penalty = adjusted_cost * risk
+        efficiency = ROI / (adjusted_cost + 1e-5)
 
-        Z1 += ROI
+        Z1 += ROI * (1 - risk) + efficiency * 2
         Z2 += (a + b + c) * adjusted_cost + risk_penalty
 
     if selected_projects > max_project_limit:
         Z2 += (selected_projects - max_project_limit) * penalty_weight
+    elif selected_projects < 3:
+        Z2 += (3 - selected_projects) * penalty_weight * 0.5
 
     return -Z1, Z2
 
 toolbox.register("evaluate", evaluate)
-toolbox.register("mate", tools.cxTwoPoint)
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.2, indpb=0.2)
-toolbox.register("select", tools.selNSGA2)
 
-# Perbaikan mutasi α, β, γ agar tetap valid
+# ------------------- Mutasi dan Crossover --------------------------
+
+toolbox.register("mate", tools.cxTwoPoint)
+
 def custom_mutate(individual):
     tools.mutGaussian(individual, mu=0, sigma=0.2, indpb=0.2)
     for i in range(NUM_PROJECTS):
@@ -93,8 +99,10 @@ def custom_mutate(individual):
     return individual,
 
 toolbox.register("mutate", custom_mutate)
+toolbox.register("select", tools.selNSGA2)
 
-# Main loop
+# ------------------------ Algoritma Utama --------------------------
+
 def main():
     pop = toolbox.population(n=100)
     hof = tools.ParetoFront()
@@ -104,21 +112,23 @@ def main():
     stats.register("max", np.max, axis=0)
 
     pop, log = algorithms.eaMuPlusLambda(
-        pop, toolbox, mu=100, lambda_=200, cxpb=0.7, mutpb=0.3,
+        pop, toolbox, mu=100, lambda_=200, cxpb=0.7, mutpb=0.6,
         ngen=50, stats=stats, halloffame=hof, verbose=True
     )
 
     return pop, log, hof
 
-final_pop, logbook, pareto = main()
+# ------------------------ Eksekusi & Visual ------------------------
 
-# Visualisasi hasil
-f1 = [-ind.fitness.values[0] for ind in pareto]
-f2 = [ind.fitness.values[1] for ind in pareto]
+if __name__ == "__main__":
+    final_pop, logbook, pareto = main()
 
-plt.scatter(f2, f1, c="red")
-plt.xlabel("Risk-Informed Cost (Z2)")
-plt.ylabel("Expected Portfolio Value (Z1)")
-plt.title("Pareto Front from NSGA-II for IFPOM")
-plt.grid()
-plt.show()
+    f1 = [-ind.fitness.values[0] for ind in pareto]
+    f2 = [ind.fitness.values[1] for ind in pareto]
+
+    plt.scatter(f2, f1, c="red")
+    plt.xlabel("Risk-Informed Cost (Z2)")
+    plt.ylabel("Expected Portfolio Value (Z1)")
+    plt.title("Updated Pareto Front from NSGA-II for IFPOM")
+    plt.grid()
+    plt.show()
