@@ -7,12 +7,12 @@ from deap import base, creator, tools, algorithms
 
 NUM_PROJECTS = 20
 
-# Buat struktur fitness dan individual
-creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0))  # -Z1 (maximize), Z2 (minimize)
+# Ubah ke 3 dimensi objektif
+creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0))  # ROI(+), Cost(-), Synergy(+)
 creator.create("Individual", list, fitness=creator.FitnessMulti)
 toolbox = base.Toolbox()
 
-# Data proyek dengan variabilitas tinggi
+# Data proyek dummy
 project_data = [{
     'roi': random.uniform(10, 100),
     'cost': random.uniform(1000, 10000),
@@ -36,18 +36,19 @@ def init_individual():
 toolbox.register("individual", tools.initIterate, creator.Individual, init_individual)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-# -------------------- Fungsi Evaluasi Bersih ------------------------
+# -------------------- Fungsi Evaluasi 3 Objektif ------------------------
 
 def evaluate(individual):
     total_roi = 0
     total_risk_adjusted_cost = 0
+    total_synergy = 0
 
     for i in range(NUM_PROJECTS):
-        x = int(round(individual[i*5]))
-        a = individual[i*5 + 1]
-        b = individual[i*5 + 2]
-        c = individual[i*5 + 3]
-        s = individual[i*5 + 4]
+        x = int(round(individual[i * 5]))  # binary project selection
+        a = individual[i * 5 + 1]
+        b = individual[i * 5 + 2]
+        c = individual[i * 5 + 3]
+        s = individual[i * 5 + 4]
 
         if x == 0:
             continue
@@ -56,14 +57,13 @@ def evaluate(individual):
         ROI = proj['roi']
         cost = proj['cost']
         risk = proj['risk']
+        synergy = proj['synergy']
 
-        # Z1: Adjusted ROI (maximize)
         total_roi += ROI * (1 - risk)
-
-        # Z2: Risk-adjusted cost (minimize)
         total_risk_adjusted_cost += (a + b + c) * cost * (1 + risk)
+        total_synergy += synergy
 
-    return -total_roi, total_risk_adjusted_cost
+    return -total_roi, total_risk_adjusted_cost, -total_synergy
 
 toolbox.register("evaluate", evaluate)
 
@@ -114,10 +114,13 @@ if __name__ == "__main__":
 
     f1 = [-ind.fitness.values[0] for ind in pareto]
     f2 = [ind.fitness.values[1] for ind in pareto]
+    f3 = [-ind.fitness.values[2] for ind in pareto]
 
+    # 2D plot Z1 vs Z2 (you can change axis to f3 if needed)
+    plt.figure(figsize=(8, 6))
     plt.scatter(f2, f1, c="red")
     plt.xlabel("Risk-Adjusted Cost (Z2)")
     plt.ylabel("Adjusted ROI (Z1)")
-    plt.title("Clean Multi-Objective Pareto Front (NSGA-II IFPOM)")
+    plt.title("Pareto Front Z1 vs Z2 (NSGA-II with Synergy Z3)")
     plt.grid()
     plt.show()
