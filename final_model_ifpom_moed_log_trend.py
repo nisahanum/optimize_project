@@ -18,7 +18,7 @@ max_gen = 100               # Jumlah generasi evolusi
 # -------------------------------
 # Data Simulatif Proyek
 # -------------------------------
-def generate_dummy_data():
+def generate_dummy_data(market_range=(0.5, 1.0), reg_range=(0.0, 0.3)):
     data = {
         'svs': np.random.uniform(50, 100, n_projects),
         'risk': np.random.uniform(0.1, 0.4, n_projects),
@@ -33,7 +33,9 @@ def generate_dummy_data():
         'r_E': 0.0,
         'r_S': 0.03,
         'r_V': 0.08,
-        'lambda': lambda_val
+        'lambda': lambda_val,
+         'market_adoption': np.random.uniform(*market_range, n_projects),
+        'regulatory_impact': np.random.uniform(*reg_range, n_projects)
     }
     return data
 
