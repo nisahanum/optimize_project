@@ -14,7 +14,7 @@ cost_of_debt_std = 0.01
 tax_rate_mean = 0.30        # Scenario 3: Change tax rate (default)
 tax_rate_std = 0.05
 
-rbf_cost_mean = 0.10        # Scenario 5: Revenue-based financing (RBF)
+rbf_cost_mean = 0.10       # Scenario 5: Revenue-based financing (RBF)
 rbf_cost_std = 0.015
 
 # Proportions for each financing source
