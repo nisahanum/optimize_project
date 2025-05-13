@@ -107,3 +107,4 @@ print(f"Mean WACC: {mean_wacc:.4f}")
 print(f"Standard Deviation of WACC: {std_wacc:.4f}")
 print(f"Mean NPV: {mean_npv:.2f}")
 print(f"Standard Deviation of NPV: {std_npv:.2f}")
+ 
