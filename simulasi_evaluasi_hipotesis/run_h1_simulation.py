@@ -1,4 +1,5 @@
-# run_h2_simulation.py
+
+# run_h1_simulation.py
 
 from copy import deepcopy
 import pandas as pd
@@ -8,25 +9,9 @@ import matplotlib.pyplot as plt
 from original_projects import load_project_data
 from load_synergy_matrix import load_synergy_matrix
 from common_ifpom import (
-    initialize_ifpom, evaluate_individual, update_ideal_point,
-    moead_generation
+    initialize_ifpom, evaluate_individual, update_ideal_point, moead_generation
 )
-
-# === Skenario H2: Definisi dan Setup ===
-def set_h2_scenario(scenario_code, projects):
-    for p in projects:
-        if scenario_code == "S2.1":
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = 0.3, 0.3, 0.4, 0.0, 0.0
-        elif scenario_code == "S2.2":
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = 0.0, 1.0, 0.0, 0.0, 0.0
-        elif scenario_code == "S2.3":
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = 0.0, 0.0, 1.0, 0.0, 0.0
-        elif scenario_code == "S2.4":
-            mix = np.random.dirichlet([1, 1, 1, 1, 1])
-            mix[2] = min(mix[2], 0.4)
-            total = sum(mix)
-            mix = [m / total for m in mix]
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = mix
+from set_h1_scenario import set_h1_scenario
 
 def compute_risks(p, w_t=0.6, w_f=0.4):
     p['risk_tech'] = ((9 - p['trl']) / 8) * p['complexity']
@@ -36,25 +21,24 @@ def compute_risks(p, w_t=0.6, w_f=0.4):
     )
     p['risk'] = max(0.05, w_t * p['risk_tech'] + w_f * p['risk_fin'])
 
-# === Eksekusi Semua Skenario H2 ===
-def run_all_h2_scenarios():
-    h2_scenarios = ["S2.1", "S2.2", "S2.3", "S2.4"]
+# === Simulasi Hipotesis 1 ===
+def run_all_h1_scenarios():
+    h1_scenarios = ["S1.1", "S1.2", "S1.3", "S1.4"]
     results = []
 
     original_projects = load_project_data()
     delta_matrix = load_synergy_matrix(num_projects=len(original_projects))
 
-    for sc in h2_scenarios:
+    for sc in h1_scenarios:
         print(f"\n=== Running Scenario {sc} ===")
         projects = deepcopy(original_projects)
-        set_h2_scenario(sc, projects)
+        set_h1_scenario(sc, projects)
 
         for p in projects:
             compute_risks(p)
 
         population, weights, neighbors = initialize_ifpom(
-            pop_size=50,
-            num_projects=len(projects)
+            pop_size=50, num_projects=len(projects)
         )
         ideal = [0.0, float('inf'), 0.0]
 
@@ -76,14 +60,8 @@ def run_all_h2_scenarios():
 
     return results
 
-# === MAIN PROGRAM ===
-if __name__ == "__main__":
-    results = run_all_h2_scenarios()
-
-    # === OPSIONAL: Simpan ke file CSV ===
-    
-
-    # === Visualisasi ===
+# === Visualisasi Hasil H1 ===
+def plot_results(results):
     df = pd.DataFrame(results)
     fig, ax = plt.subplots(1, 3, figsize=(18, 5))
 
@@ -102,12 +80,11 @@ if __name__ == "__main__":
     ax[2].set_ylabel('Synergy')
     ax[2].set_ylim(0, df['Z3'].max() + 100)
 
-    plt.suptitle("Hasil Simulasi Hipotesis H2 per Skenario", fontsize=16)
+    plt.suptitle("Hasil Simulasi Hipotesis H1 per Skenario", fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
-    
-    
-#simpan ke file csv
-#df_save = pd.DataFrame(results)
-#df_save.to_csv("hasil_simulasi_H2_ver2.csv", index=False)
-#print("✅ Hasil simulasi H2 disimpan ke: hasil_simulasi_H2.csv")
+
+# === Main Program ===
+if __name__ == "__main__":
+    results = run_all_h1_scenarios()
+    plot_results(results)
