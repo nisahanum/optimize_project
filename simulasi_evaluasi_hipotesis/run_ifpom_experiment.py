@@ -5,6 +5,8 @@ from common_ifpom import (
     moead_generation,
     evaluate_individual
 )
+from config import POPULATION_SIZE, NUM_GENERATIONS
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -30,9 +32,8 @@ np.random.seed(42)
 delta_matrix = np.random.uniform(0, 50, size=(NUM_PROJECTS, NUM_PROJECTS))
 np.fill_diagonal(delta_matrix, 0)
 
-# === MOEA/D Parameters ===
-POP_SIZE = 50
-NUM_GENERATIONS = 100
+# === MOEA/D Parameters from config ===
+POP_SIZE = POPULATION_SIZE
 population, weight_vectors, neighborhoods = initialize_ifpom(POP_SIZE, NUM_PROJECTS)
 
 # === Evaluate Initial Population and Set Ideal Point ===
@@ -71,4 +72,22 @@ ax.set_ylabel('Z2 - Financial Cost')
 ax.set_zlabel('Z3 - Synergy')
 plt.title('Final Pareto Front (IFPOM-MOEA/D)')
 plt.grid(True)
+plt.show()
+
+# === Plot Z1, Z2, Z3 Convergence Over Generations ===
+generations = [h[0] for h in history]
+Z1_convergence = [h[1] for h in history]
+Z2_convergence = [h[2] for h in history]
+Z3_convergence = [h[3] for h in history]
+
+plt.figure(figsize=(12, 6))
+plt.plot(generations, Z1_convergence, label='Z1 - Strategic Value', marker='o')
+plt.plot(generations, Z2_convergence, label='Z2 - Financial Cost', marker='o')
+plt.plot(generations, Z3_convergence, label='Z3 - Synergy', marker='o')
+plt.xlabel("Generation")
+plt.ylabel("Objective Value")
+plt.title("Convergence of Z₁, Z₂, and Z₃ Over Generations")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
 plt.show()

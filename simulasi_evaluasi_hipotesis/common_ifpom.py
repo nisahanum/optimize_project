@@ -1,3 +1,5 @@
+from config import INITIAL_MUTATION_RATE, MIN_MUTATION_RATE, DIVERSITY_THRESHOLD, DIVERSITY_ACCEPTANCE_PROB
+
 import numpy as np
 import random
 from copy import deepcopy
@@ -68,7 +70,7 @@ def crossover(parent1, parent2):
     return child
 
 def moead_generation(population, projects, delta_matrix, weight_vectors, neighborhoods, ideal_point, gen, max_gen):
-    mutation_prob = 0.2 * (1 - gen / max_gen)
+    mutation_prob = INITIAL_MUTATION_RATE * (1 - gen / max_gen) + MIN_MUTATION_RATE
     for i in range(len(population)):
         neighbors = neighborhoods[i]
         p1, p2 = random.sample(list(neighbors), 2)
@@ -82,7 +84,8 @@ def moead_generation(population, projects, delta_matrix, weight_vectors, neighbo
         for j in neighbors:
             old_fit = tchebycheff_eval(population[j]['Z'], weight_vectors[j], ideal_point)
             new_fit = tchebycheff_eval(child['Z'], weight_vectors[j], ideal_point)
-            if new_fit < old_fit:
+            diversity_x = sum(child['x'][k] != population[j]['x'][k] for k in range(len(child['x'])))
+            if new_fit < old_fit or (diversity_x >= DIVERSITY_THRESHOLD and random.random() < DIVERSITY_ACCEPTANCE_PROB):
                 population[j] = deepcopy(child)
         update_ideal_point(child['Z'], ideal_point)
     return population, ideal_point
