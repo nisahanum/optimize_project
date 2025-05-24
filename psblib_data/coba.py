@@ -1,75 +1,74 @@
 import os
-
-# Step 1: Define the parser
 import re
 
-import re
+# Update this to your local path
+folder_path = r"C:\Users\nisahanum\Documents\cobagit\optimize_project\psblib_data\data\j30.mm"
 
-import re
-
-def parse_sm_file(filepath):
+def parse_mm_file(filepath):
     with open(filepath, 'r') as file:
-        content = file.read()
-
-    # === Extract number of jobs ===
-    match = re.search(r'jobs \(incl\. supersource/sink \):\s+(\d+)', content)
-    if match:
-        n_jobs = int(match.group(1))
-    else:
-        n_jobs = 0
+        lines = file.readlines()
 
     jobs = {}
+    reading_precedence = False
+    reading_modes = False
 
-    # === Extract PRECEDENCE RELATIONS ===
-    precedence_block = re.search(r'PRECEDENCE RELATIONS:(.*?)REQUESTS/DURATIONS:', content, re.DOTALL)
-    if precedence_block:
-        lines = precedence_block.group(1).splitlines()
-        for line in lines:
-            line = line.strip()
-            if not line or line.startswith("jobnr.") or line.startswith("-"):
-                continue
+    for line in lines:
+        line = line.strip()
+
+        if line.startswith("PRECEDENCE RELATIONS:"):
+            reading_precedence = True
+            continue
+        if line.startswith("REQUESTS/DURATIONS:"):
+            reading_precedence = False
+            reading_modes = True
+            continue
+        if line.startswith("RESOURCEAVAILABILITIES:"):
+            reading_modes = False
+            continue
+
+        # === Skip empty lines and header rows ===
+        if not line or any(x in line for x in ['jobnr', 'mode', '----']):
+            continue
+
+        # === Parse PRECEDENCE RELATIONS ===
+        if reading_precedence:
             parts = line.split()
-            if len(parts) >= 4:
+            if len(parts) >= 4 and parts[0].isdigit():
                 job_id = int(parts[0])
                 n_successors = int(parts[2])
                 successors = list(map(int, parts[3:3 + n_successors]))
-                jobs[job_id] = {'successors': successors}
+                jobs[job_id] = {'successors': successors, 'modes': {}}
 
-    # === Extract DURATIONS from REQUESTS/DURATIONS section ===
-    durations_block = re.search(r'REQUESTS/DURATIONS:(.*?)RESOURCEAVAILABILITIES:', content, re.DOTALL)
-    if durations_block:
-        lines = durations_block.group(1).splitlines()
-        for line in lines:
-            line = line.strip()
-            if not line or line.startswith("jobnr.") or line.startswith("-"):
-                continue
+        # === Parse REQUESTS/DURATIONS ===
+        if reading_modes:
             parts = line.split()
-            if len(parts) >= 3:
+            if len(parts) >= 4 and parts[0].isdigit() and parts[1].isdigit():
                 job_id = int(parts[0])
+                mode_id = int(parts[1])
                 duration = int(parts[2])
-                if job_id in jobs:
-                    jobs[job_id]['duration'] = duration
-                else:
-                    jobs[job_id] = {'duration': duration, 'successors': []}
+                resources = list(map(int, parts[3:]))
+                if job_id not in jobs:
+                    jobs[job_id] = {'successors': [], 'modes': {}}
+                jobs[job_id]['modes'][mode_id] = {'duration': duration, 'resources': resources}
 
-    return {
-        'n_jobs': n_jobs,
-        'jobs': jobs
-    }
+    return jobs
 
 
 
+# Read all files in the folder
+all_files = sorted([f for f in os.listdir(folder_path) if f.endswith('.mm')])
+sample_files = all_files[:3]  # Just the first 3 for example
 
+parsed_projects = {}
 
-# Step 2: Set the folder path
-folder_path = "/Users/nisahanum/Documents/S3/Bimbingan/SK 2/data set/j30.sm"
-
-# Step 3: Loop through .sm files and parse them
-files = [f for f in os.listdir(folder_path) if f.endswith('.sm')]
-
-for fname in files:
+for fname in sample_files:
     full_path = os.path.join(folder_path, fname)
-    parsed = parse_sm_file(full_path)
-    print(f"Parsed {fname}:")
-    print(f"  Total Jobs: {parsed['n_jobs']}")
-    print(f"  First 3 Jobs: {list(parsed['jobs'].items())[:3]}")
+    project_id = fname.replace('.mm', '')
+    parsed_projects[project_id] = parse_mm_file(full_path)
+    print(f"Parsed {project_id}:")
+    for job_id, job_data in list(parsed_projects[project_id].items())[:3]:
+        print(f"  Job {job_id}:")
+        print(f"    Successors: {job_data['successors']}")
+        for mode_id, mode_info in job_data['modes'].items():
+            print(f"      Mode {mode_id}: Duration={mode_info['duration']}, Resources={mode_info['resources']}")
+        print("-" * 50)
