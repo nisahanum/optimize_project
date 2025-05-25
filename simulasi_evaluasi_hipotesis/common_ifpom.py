@@ -1,4 +1,6 @@
+
 from config import INITIAL_MUTATION_RATE, MIN_MUTATION_RATE, DIVERSITY_THRESHOLD, DIVERSITY_ACCEPTANCE_PROB
+from tchebycheff_utils import tchebycheff_eval
 
 import numpy as np
 import random
@@ -30,9 +32,6 @@ def evaluate_individual(ind, projects, delta_matrix):
             if ind['x'][i] == 1 and ind['x'][j] == 1:
                 Z1 += lambda_val * delta_matrix[i][j]
     return [Z1, Z2, Z3]
-
-def tchebycheff_eval(Z, weight, ideal):
-    return max([weight[i] * abs(Z[i] - ideal[i]) for i in range(len(Z))])
 
 def update_ideal_point(Z, ideal):
     ideal[0] = max(ideal[0], Z[0])
@@ -69,23 +68,36 @@ def crossover(parent1, parent2):
             child[key].append(val)
     return child
 
-def moead_generation(population, projects, delta_matrix, weight_vectors, neighborhoods, ideal_point, gen, max_gen):
+def moead_generation(population, projects, delta_matrix, weight_vectors, neighborhoods, ideal_point, gen, max_gen, z_min, z_max):
     mutation_prob = INITIAL_MUTATION_RATE * (1 - gen / max_gen) + MIN_MUTATION_RATE
+
     for i in range(len(population)):
         neighbors = neighborhoods[i]
         p1, p2 = random.sample(list(neighbors), 2)
         child = crossover(population[p1], population[p2])
+
         for m in range(len(projects)):
-            if random.random() < mutation_prob:
+            if random.random() < mutation_prob or child['x'][m] == population[p1]['x'][m]:
                 child['x'][m] = 1 - child['x'][m]
+
         if sum(child['x']) == 0:
             child['x'][random.randint(0, len(projects) - 1)] = 1
+
         child['Z'] = evaluate_individual(child, projects, delta_matrix)
+
         for j in neighbors:
-            old_fit = tchebycheff_eval(population[j]['Z'], weight_vectors[j], ideal_point)
-            new_fit = tchebycheff_eval(child['Z'], weight_vectors[j], ideal_point)
+            old_fit = tchebycheff_eval(population[j]['Z'], weight_vectors[j], ideal_point, z_min, z_max)
+            new_fit = tchebycheff_eval(child['Z'], weight_vectors[j], ideal_point, z_min, z_max)
+
             diversity_x = sum(child['x'][k] != population[j]['x'][k] for k in range(len(child['x'])))
+
             if new_fit < old_fit or (diversity_x >= DIVERSITY_THRESHOLD and random.random() < DIVERSITY_ACCEPTANCE_PROB):
                 population[j] = deepcopy(child)
+
         update_ideal_point(child['Z'], ideal_point)
-    return population, ideal_point
+
+        for k in range(3):
+            z_min[k] = min(z_min[k], child['Z'][k])
+            z_max[k] = max(z_max[k], child['Z'][k])
+
+    return population, ideal_point, z_min, z_max

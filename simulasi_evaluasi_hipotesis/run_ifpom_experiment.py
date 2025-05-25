@@ -27,10 +27,10 @@ for p in projects:
     )
     p['risk'] = max(0.05, 0.6 * risk_tech + 0.4 * risk_fin)
 
-# === Create Dummy Delta Matrix for Pairwise Synergy ===
-np.random.seed(42)
-delta_matrix = np.random.uniform(0, 50, size=(NUM_PROJECTS, NUM_PROJECTS))
-np.fill_diagonal(delta_matrix, 0)
+# === real cosine-based synergy matrix ===
+import pandas as pd
+delta_matrix = pd.read_csv("synergy_matrix_cosine_normalized.csv", index_col=0).values
+
 
 # === MOEA/D Parameters from config ===
 POP_SIZE = POPULATION_SIZE
@@ -47,22 +47,41 @@ for ind in population:
             ideal_point[i] = min(ideal_point[i], ind['Z'][i])
         else:
             ideal_point[i] = max(ideal_point[i], ind['Z'][i])
+            
+# === Initialize dynamic normalization bounds ===
+z_min = [float('inf')] * 3
+z_max = [float('-inf')] * 3
+
 
 # === Run MOEA/D ===
 history = []
 for gen in range(NUM_GENERATIONS):
-    population, ideal_point = moead_generation(
-        population, projects, delta_matrix, weight_vectors, neighborhoods, ideal_point, gen, NUM_GENERATIONS
-    )
+    population, ideal_point, z_min, z_max = moead_generation(
+    population, projects, delta_matrix,
+    weight_vectors, neighborhoods, ideal_point,
+    gen, NUM_GENERATIONS, z_min, z_max
+)
+
     if gen % 10 == 0:
         best_Z = max([ind['Z'][0] for ind in population]), min([ind['Z'][1] for ind in population]), max([ind['Z'][2] for ind in population])
         history.append((gen, *best_Z))
         print(f"Generation {gen}: Best Z1 = {best_Z[0]:.2f}, Z2 = {best_Z[1]:.2f}, Z3 = {best_Z[2]:.2f}")
 
+# ✅ ADD THIS BLOCK HERE
+print("\n📊 Final Population Objectives:")
+for i, ind in enumerate(population):
+    print(f"Individual {i}: Z1={ind['Z'][0]:.2f}, Z2={ind['Z'][1]:.4f}, Z3={ind['Z'][2]:.2f}")
+
 # === Visualize Final Pareto Front ===
 Z1_vals = [ind['Z'][0] for ind in population]
 Z2_vals = [ind['Z'][1] for ind in population]
 Z3_vals = [ind['Z'][2] for ind in population]
+
+
+# ⬇️ Add this to check diversity
+print("🧪 Unique Z1 values:", len(set(Z1_vals)))
+print("🧪 Unique Z2 values:", len(set(Z2_vals)))
+print("🧪 Unique Z3 values:", len(set(Z3_vals)))
 
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111, projection='3d')
