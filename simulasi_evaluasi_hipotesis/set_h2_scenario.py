@@ -33,36 +33,38 @@ def set_h2_scenario(scenario_code, projects):
             p['delta'] = 0.0
 
     elif scenario_code == "S2.4":
-    # Adaptive Hybrid Funding: aggressive when SVS is high
+    # Adaptive Hybrid Funding: relaxed θ cap for strategic, low-risk projects
       for p in projects:
         risk = p.get('risk', 0.5)
         svs = p.get('svs', 60)
+        fuzzy = p.get('fuzzy_cost', (2.0, 2.5, 3.0))
+        cost_est = (fuzzy[0] + 2 * fuzzy[1] + fuzzy[2]) / 4
 
-        if svs > 80:
-            # Strategic project → tolerate vendor
+        if svs > 85 and risk < 0.4:
+            # Very strategic and low-risk → allow high vendor
             alpha, beta, theta = 0.1, 0.2, 0.7
         elif risk > 0.6:
-            # High risk → prefer equity
+            # High risk → equity-heavy
             alpha, beta, theta = 0.6, 0.3, 0.1
         else:
-            # Default balanced
-            alpha, beta, theta = 0.3, 0.3, 0.4
+            # Balanced fallback
+            alpha, beta, theta = 0.4, 0.3, 0.3
 
-        # Cap θ and redistribute if needed
-        if theta > 0.4:
+        # Only cap θ for non-strategic or risky projects
+        if theta > 0.4 and not (svs > 85 and risk < 0.4):
             excess = theta - 0.4
             theta = 0.4
-            alpha += 0.6 * excess
-            beta += 0.4 * excess
+            alpha += excess * 0.6
+            beta += excess * 0.4
 
+        # Normalize
         total = alpha + beta + theta
-        alpha /= total
-        beta /= total
-        theta /= total
-
-        p['alpha'], p['beta'], p['theta'] = alpha, beta, theta
+        p['alpha'] = alpha / total
+        p['beta'] = beta / total
+        p['theta'] = theta / total
         p['gamma'] = 0.0
         p['delta'] = 0.0
+
 
     else:
         raise ValueError(f"Unknown scenario code: {scenario_code}")

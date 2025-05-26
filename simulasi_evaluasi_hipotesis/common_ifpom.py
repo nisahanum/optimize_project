@@ -6,31 +6,59 @@ import numpy as np
 import random
 from copy import deepcopy
 
-def evaluate_individual(ind, projects, delta_matrix):
+def evaluate_individual(ind, projects, delta_matrix, n_samples=10):
+    import numpy as np
+
     Z1, Z2, Z3 = 0.0, 0.0, 0.0
     n = len(projects)
+
     for i in range(n):
         if ind['x'][i] == 1:
             p = projects[i]
-            Z1 += p['svs'] * (1 - p['risk'])
-            fuzzy_cost = p['fuzzy_cost']
-            raw_cost = (fuzzy_cost[0] + 2 * fuzzy_cost[1] + fuzzy_cost[2]) / 4
-            synergy = p['synergy_same'] + p['synergy_cross']
-            adjusted_cost = max(1.0, raw_cost - synergy)
-            weight = (
-                p['alpha'] * 0.01 +
-                p['beta'] * 0.03 +
-                p['theta'] * 0.08 +
-                p['gamma'] * 0.01 +
-                p['delta'] * 0.06
+
+            # Z1: Strategic value adjusted by risk
+            Z1 += (p['svs'] + 0.5 * (p['synergy_same'] + p['synergy_cross'])) * (1 - p['risk'])
+
+            # === Monte Carlo fuzzy cost sampling ===
+            c1, c2, c3 = p['fuzzy_cost']
+            fuzzy_samples = np.random.triangular(c1, c2, c3, n_samples)
+
+            # Funding cost multiplier based on funding mix
+            funding_penalty = (
+                p['alpha'] * 0.9 +    # Equity
+                p['beta'] * 1.0 +     # Soft loan
+                p['theta'] * 1.3 +    # Vendor more expensive
+                p['gamma'] * 1.1 +    # Grant overhead
+                p['delta'] * 1.2      # PPP complexity
             )
-            Z2 += adjusted_cost * weight * p['risk']
+
+            synergy = p['synergy_same'] + p['synergy_cross']
+
+            total_effective_cost = 0.0
+            for sample_cost in fuzzy_samples:
+                base_cost = max(1.0, sample_cost - synergy)
+                effective_cost = base_cost * funding_penalty
+
+                # Optional: cap runaway cost
+                effective_cost = min(effective_cost, base_cost * 1.5)
+
+                total_effective_cost += effective_cost
+
+            avg_cost = total_effective_cost / n_samples
+
+            # Z2: risk-adjusted average effective cost
+            Z2 += avg_cost * p['risk']
+
+            # Z3: aggregate synergy
             Z3 += synergy
-    lambda_val = 1.0
+
+    # Z1: inter-project synergy bonus
+    lambda_val = 2.5
     for i in range(n):
         for j in range(i + 1, n):
             if ind['x'][i] == 1 and ind['x'][j] == 1:
                 Z1 += lambda_val * delta_matrix[i][j]
+
     return [Z1, Z2, Z3]
 
 def update_ideal_point(Z, ideal):
