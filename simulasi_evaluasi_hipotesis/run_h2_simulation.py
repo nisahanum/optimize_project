@@ -1,5 +1,3 @@
-# run_h2_simulation.py
-
 from copy import deepcopy
 import pandas as pd
 import numpy as np
@@ -11,22 +9,7 @@ from common_ifpom import (
     initialize_ifpom, evaluate_individual, update_ideal_point,
     moead_generation
 )
-
-# === Skenario H2: Definisi dan Setup ===
-def set_h2_scenario(scenario_code, projects):
-    for p in projects:
-        if scenario_code == "S2.1":
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = 0.3, 0.3, 0.4, 0.0, 0.0
-        elif scenario_code == "S2.2":
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = 0.0, 1.0, 0.0, 0.0, 0.0
-        elif scenario_code == "S2.3":
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = 0.0, 0.0, 1.0, 0.0, 0.0
-        elif scenario_code == "S2.4":
-            mix = np.random.dirichlet([1, 1, 1, 1, 1])
-            mix[2] = min(mix[2], 0.4)
-            total = sum(mix)
-            mix = [m / total for m in mix]
-            p['alpha'], p['beta'], p['theta'], p['gamma'], p['delta'] = mix
+from set_h2_scenario import set_h2_scenario  # now separate
 
 def compute_risks(p, w_t=0.6, w_f=0.4):
     p['risk_tech'] = ((9 - p['trl']) / 8) * p['complexity']
@@ -36,13 +19,12 @@ def compute_risks(p, w_t=0.6, w_f=0.4):
     )
     p['risk'] = max(0.05, w_t * p['risk_tech'] + w_f * p['risk_fin'])
 
-# === Eksekusi Semua Skenario H2 ===
 def run_all_h2_scenarios():
     h2_scenarios = ["S2.1", "S2.2", "S2.3", "S2.4"]
     results = []
 
     original_projects = load_project_data()
-    delta_matrix = load_synergy_matrix(num_projects=len(original_projects))
+    delta_matrix = load_synergy_matrix()
 
     for sc in h2_scenarios:
         print(f"\n=== Running Scenario {sc} ===")
@@ -62,8 +44,20 @@ def run_all_h2_scenarios():
             ind['Z'] = evaluate_individual(ind, projects, delta_matrix)
             update_ideal_point(ind['Z'], ideal)
 
+        # Dynamically compute z_min, z_max from population
+        z_min = list(population[0]['Z'])
+        z_max = list(population[0]['Z'])
+        for ind in population:
+            for k in range(3):
+                z_min[k] = min(z_min[k], ind['Z'][k])
+                z_max[k] = max(z_max[k], ind['Z'][k])
+
         for gen in range(100):
-            moead_generation(population, projects, delta_matrix, weights, neighbors, ideal)
+            moead_generation(
+                population, projects, delta_matrix,
+                weights, neighbors, ideal,
+                gen, 100, z_min, z_max
+            )
 
         best = max(population, key=lambda ind: ind['Z'][0])
         print(f"{sc} → Z1 = {best['Z'][0]:.2f}, Z2 = {best['Z'][1]:.2f}, Z3 = {best['Z'][2]:.2f}")
@@ -80,34 +74,28 @@ def run_all_h2_scenarios():
 if __name__ == "__main__":
     results = run_all_h2_scenarios()
 
-    # === OPSIONAL: Simpan ke file CSV ===
-    
-
-    # === Visualisasi ===
     df = pd.DataFrame(results)
     fig, ax = plt.subplots(1, 3, figsize=(18, 5))
 
     ax[0].bar(df['scenario'], df['Z1'], color='skyblue')
-    ax[0].set_title('Z1 - Strategic Value')
-    ax[0].set_ylabel('Score')
+    ax[0].set_title('Z1 – Value Achieved Under Funding Strategy')
+    ax[0].set_ylabel('Strategic Value (Risk-Adjusted)')
     ax[0].set_ylim(0, df['Z1'].max() + 100)
 
     ax[1].bar(df['scenario'], df['Z2'], color='salmon')
-    ax[1].set_title('Z2 - Risk-Adjusted Financial Cost')
+    ax[1].set_title('Z2 – Funding Cost (Risk-Informed)')
     ax[1].set_ylabel('Cost')
-    ax[1].set_ylim(0, df['Z2'].max() + 100)
+    ax[1].set_ylim(0, df['Z2'].max() + 1)
 
     ax[2].bar(df['scenario'], df['Z3'], color='lightgreen')
-    ax[2].set_title('Z3 - Total Synergy')
+    ax[2].set_title('Z3 – Portfolio Synergy (Indirect Benefit)')
     ax[2].set_ylabel('Synergy')
     ax[2].set_ylim(0, df['Z3'].max() + 100)
 
-    plt.suptitle("Hasil Simulasi Hipotesis H2 per Skenario", fontsize=16)
+    plt.suptitle("Hypothesis 2 – Effectiveness of Adaptive Hybrid Funding", fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
-    
-    
-#simpan ke file csv
-#df_save = pd.DataFrame(results)
-#df_save.to_csv("hasil_simulasi_H2_ver2.csv", index=False)
-#print("✅ Hasil simulasi H2 disimpan ke: hasil_simulasi_H2.csv")
+
+    # Save CSV (optional)
+    # df.to_csv("hasil_simulasi_H2.csv", index=False)
+    # print("✅ Hasil simulasi disimpan ke hasil_simulasi_H2.csv")

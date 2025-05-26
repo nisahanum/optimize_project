@@ -1,6 +1,3 @@
-
-# run_h1_simulation.py
-
 from copy import deepcopy
 import pandas as pd
 import numpy as np
@@ -12,6 +9,10 @@ from common_ifpom import (
     initialize_ifpom, evaluate_individual, update_ideal_point, moead_generation
 )
 from set_h1_scenario import set_h1_scenario
+
+# Optional: constants for generations
+MAX_GENERATIONS = 100
+POPULATION_SIZE = 50
 
 def compute_risks(p, w_t=0.6, w_f=0.4):
     p['risk_tech'] = ((9 - p['trl']) / 8) * p['complexity']
@@ -27,7 +28,7 @@ def run_all_h1_scenarios():
     results = []
 
     original_projects = load_project_data()
-    delta_matrix = load_synergy_matrix(num_projects=len(original_projects))
+    delta_matrix = load_synergy_matrix()
 
     for sc in h1_scenarios:
         print(f"\n=== Running Scenario {sc} ===")
@@ -38,16 +39,29 @@ def run_all_h1_scenarios():
             compute_risks(p)
 
         population, weights, neighbors = initialize_ifpom(
-            pop_size=50, num_projects=len(projects)
+            pop_size=POPULATION_SIZE, num_projects=len(projects)
         )
         ideal = [0.0, float('inf'), 0.0]
 
+        # Evaluate initial population and update ideal
         for ind in population:
             ind['Z'] = evaluate_individual(ind, projects, delta_matrix)
             update_ideal_point(ind['Z'], ideal)
 
-        for gen in range(100):
-            moead_generation(population, projects, delta_matrix, weights, neighbors, ideal)
+        # Dynamically compute z_min, z_max
+        z_min = list(population[0]['Z'])
+        z_max = list(population[0]['Z'])
+        for ind in population:
+            for k in range(3):
+                z_min[k] = min(z_min[k], ind['Z'][k])
+                z_max[k] = max(z_max[k], ind['Z'][k])
+
+        for gen in range(MAX_GENERATIONS):
+            moead_generation(
+                population, projects, delta_matrix,
+                weights, neighbors, ideal,
+                gen, MAX_GENERATIONS, z_min, z_max
+            )
 
         best = max(population, key=lambda ind: ind['Z'][0])
         print(f"{sc} → Z1 = {best['Z'][0]:.2f}, Z2 = {best['Z'][1]:.2f}, Z3 = {best['Z'][2]:.2f}")
@@ -73,7 +87,8 @@ def plot_results(results):
     ax[1].bar(df['scenario'], df['Z2'], color='salmon')
     ax[1].set_title('Z2 - Risk-Adjusted Financial Cost')
     ax[1].set_ylabel('Cost')
-    ax[1].set_ylim(0, df['Z2'].max() + 100)
+    ax[1].set_ylim(0, df['Z2'].max() + 1)  # fix to show visible bars
+
 
     ax[2].bar(df['scenario'], df['Z3'], color='lightgreen')
     ax[2].set_title('Z3 - Total Synergy')
