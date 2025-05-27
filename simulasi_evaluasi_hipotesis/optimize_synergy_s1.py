@@ -7,33 +7,7 @@ from load_synergy_matrix import load_synergy_matrix
 from common_ifpom import (
     initialize_ifpom, evaluate_individual, update_ideal_point, moead_generation
 )
-
-def apply_adaptive_funding(projects, theta_cap, synergy_weight):
-    for p in projects:
-        risk = p.get('risk', 0.5)
-        svs = p.get('svs', 60)
-        fuzzy = p.get('fuzzy_cost', (2.0, 2.5, 3.0))
-        cost_est = (fuzzy[0] + 2 * fuzzy[1] + fuzzy[2]) / 4
-
-        if svs > 85 and risk < 0.4:
-            alpha, beta, theta = 0.2, 0.2, 0.6
-        elif risk > 0.6:
-            alpha, beta, theta = 0.6, 0.3, 0.1
-        else:
-            alpha, beta, theta = 0.4, 0.3, 0.3
-
-        if theta > theta_cap:
-            excess = theta - theta_cap
-            theta = theta_cap
-            alpha += excess * 0.6
-            beta += excess * 0.4
-
-        total = alpha + beta + theta
-        p['alpha'] = alpha / total
-        p['beta'] = beta / total
-        p['theta'] = theta / total
-        p['gamma'] = 0.0
-        p['delta'] = 0.0
+from set_h1_scenario import set_h1_scenario
 
 def compute_risks(p, w_t=0.6, w_f=0.4):
     p['risk_tech'] = ((9 - p['trl']) / 8) * p['complexity']
@@ -43,12 +17,12 @@ def compute_risks(p, w_t=0.6, w_f=0.4):
     )
     p['risk'] = max(0.05, w_t * p['risk_tech'] + w_f * p['risk_fin'])
 
-def run_simulation(config_id, theta_cap, synergy_weight, generations=100, pop_size=50):
+def run_synergy_simulation(config_id, scenario_code, synergy_weight, generations=100, pop_size=50):
     original_projects = load_project_data()
     delta_matrix = load_synergy_matrix()
     projects = deepcopy(original_projects)
 
-    apply_adaptive_funding(projects, theta_cap, synergy_weight)
+    set_h1_scenario(scenario_code, projects)
     for p in projects:
         compute_risks(p)
 
@@ -70,29 +44,41 @@ def run_simulation(config_id, theta_cap, synergy_weight, generations=100, pop_si
         moead_generation(population, projects, delta_matrix, weights, neighbors, ideal, gen, generations, z_min, z_max)
 
     best = max(population, key=lambda ind: ind['Z'][0])
-    print(f"[Config {config_id}] θ≤{theta_cap}, λ={synergy_weight} → Z1={best['Z'][0]:.2f}, Z2={best['Z'][1]:.2f}, Z3={best['Z'][2]:.2f}")
+    print(f"[Config {config_id}] Scenario={scenario_code}, λ={synergy_weight} → Z1={best['Z'][0]:.2f}, Z2={best['Z'][1]:.2f}, Z3={best['Z'][2]:.2f}")
     return {
         'ConfigID': config_id,
-        'ThetaCap': theta_cap,
-        'SynergyWeight': synergy_weight,
+        'Scenario': scenario_code,
+        'Lambda': synergy_weight,
         'Z1': best['Z'][0],
         'Z2': best['Z'][1],
         'Z3': best['Z'][2]
     }
 
-def run_experiments():
-    theta_caps = [0.3, 0.4, 0.5, 0.6, 0.7]
+def run_synergy_experiments():
+    scenarios = ["S1.1", "S1.2", "S1.3", "S1.4"]
     synergy_weights = [0.5, 1.0, 2.5, 5.0, 7.5]
-    configs = list(itertools.product(theta_caps, synergy_weights))
+    configs = list(itertools.product(scenarios, synergy_weights))
 
     results = []
-    for i, (theta_cap, synergy_weight) in enumerate(configs):
-        result = run_simulation(i+1, theta_cap, synergy_weight)
+    for i, (scenario_code, synergy_weight) in enumerate(configs):
+        result = run_synergy_simulation(i+1, scenario_code, synergy_weight)
         results.append(result)
 
     df = pd.DataFrame(results)
-    #df.to_csv("s2_4_monte_carlo_results_2.csv", index=False)
-    print("✅ All results saved to s2_4_monte_carlo_results.csv")
+    df.to_csv("s1_synergy_tuning_results.csv", index=False)
+    print("✅ All results saved to s1_synergy_tuning_results.csv")
+
+    # === Optional Visualization ===
+    import matplotlib.pyplot as plt
+    pivot_z1 = df.pivot(index="Lambda", columns="Scenario", values="Z1").sort_index()
+    pivot_z1.plot(kind='bar', figsize=(12, 6))
+    plt.title("Z₁ – Strategic Value per Scenario and Synergy Weight λ")
+    plt.xlabel("Synergy Weight (λ)")
+    plt.ylabel("Strategic Value (Z₁)")
+    plt.legend(title="Scenario")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
-    run_experiments()
+    run_synergy_experiments()
