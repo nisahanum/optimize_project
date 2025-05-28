@@ -6,6 +6,7 @@ def load_project_data():
         {
             'id': 'j3014_9',
             'classification': 'AutoClassified',
+            'benefit_group': 'Operational Efficiency',
             'svs': 74.69,
             'trl': 5,
             'complexity': 0.5,
@@ -21,6 +22,7 @@ def load_project_data():
         {
             'id': 'j3015_1',
             'classification': 'AutoClassified',
+            'benefit_group': 'Customer Experience',
             'svs': 74.59,
             'trl': 5,
             'complexity': 0.5,
@@ -36,6 +38,7 @@ def load_project_data():
         {
             'id': 'j3015_10',
             'classification': 'AutoClassified',
+            'benefit_group': 'Business Culture',
             'svs': 75.44,
             'trl': 5,
             'complexity': 0.5,
@@ -51,6 +54,7 @@ def load_project_data():
         {
             'id': 'j3015_2',
             'classification': 'AutoClassified',
+            'benefit_group': 'Business Culture',
             'svs': 72.47,
             'trl': 5,
             'complexity': 0.5,
@@ -66,6 +70,7 @@ def load_project_data():
         {
             'id': 'j3015_3',
             'classification': 'AutoClassified',
+            'benefit_group': 'Customer Experience',
             'svs': 75.25,
             'trl': 5,
             'complexity': 0.5,
@@ -81,6 +86,7 @@ def load_project_data():
         {
             'id': 'j3015_4',
             'classification': 'AutoClassified',
+            'benefit_group': 'Operational Efficiency',
             'svs': 77.22,
             'trl': 5,
             'complexity': 0.5,
@@ -96,6 +102,7 @@ def load_project_data():
         {
             'id': 'j3015_5',
             'classification': 'AutoClassified',
+            'benefit_group': 'Customer Experience',
             'svs': 76.5,
             'trl': 5,
             'complexity': 0.5,
@@ -111,6 +118,7 @@ def load_project_data():
         {
             'id': 'j3015_6',
             'classification': 'AutoClassified',
+            'benefit_group': 'Business Culture',
             'svs': 69.84,
             'trl': 5,
             'complexity': 0.5,
@@ -126,6 +134,7 @@ def load_project_data():
         {
             'id': 'j3015_7',
             'classification': 'AutoClassified',
+            'benefit_group': 'Operational Efficiency',
             'svs': 75.44,
             'trl': 5,
             'complexity': 0.5,
@@ -141,6 +150,7 @@ def load_project_data():
         {
             'id': 'j3015_8',
             'classification': 'AutoClassified',
+            'benefit_group': 'Customer Experience',
             'svs': 75.28,
             'trl': 5,
             'complexity': 0.5,
@@ -156,6 +166,7 @@ def load_project_data():
         {
             'id': 'j3015_9',
             'classification': 'AutoClassified',
+            'benefit_group': 'Operational Efficiency',
             'svs': 76.78,
             'trl': 5,
             'complexity': 0.5,

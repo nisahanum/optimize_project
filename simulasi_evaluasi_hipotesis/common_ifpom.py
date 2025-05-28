@@ -12,12 +12,22 @@ def evaluate_individual(ind, projects, delta_matrix, n_samples=10):
     Z1, Z2, Z3 = 0.0, 0.0, 0.0
     n = len(projects)
 
+    benefit_lambda = {
+        'Operational Efficiency': 1.50,
+        'Customer Experience': 1.43,
+        'Business Culture': 1.00
+    }
+
     for i in range(n):
         if ind['x'][i] == 1:
             p = projects[i]
 
-            # Z1: Strategic value adjusted by risk
-            Z1 += (p['svs'] + 0.5 * (p['synergy_same'] + p['synergy_cross'])) * (1 - p['risk'])
+            # λ_b based on benefit group
+            λ_b = benefit_lambda.get(p.get('benefit_group', 'Business Culture'), 1.00)
+
+            # Strategic value including synergy contribution
+            synergy_score = p['synergy_same'] + p['synergy_cross']
+            Z1 += (p['svs'] + λ_b * synergy_score) * (1 - p['risk'])
 
             # === Monte Carlo fuzzy cost sampling ===
             c1, c2, c3 = p['fuzzy_cost']
@@ -25,39 +35,32 @@ def evaluate_individual(ind, projects, delta_matrix, n_samples=10):
 
             # Funding cost multiplier based on funding mix
             funding_penalty = (
-                p['alpha'] * 0.9 +    # Equity
-                p['beta'] * 1.0 +     # Soft loan
-                p['theta'] * 1.3 +    # Vendor more expensive
-                p['gamma'] * 1.1 +    # Grant overhead
-                p['delta'] * 1.2      # PPP complexity
+                p['alpha'] * 0.9 +
+                p['beta'] * 1.0 +
+                p['theta'] * 1.3 +
+                p['gamma'] * 1.1 +
+                p['delta'] * 1.2
             )
-
-            synergy = p['synergy_same'] + p['synergy_cross']
 
             total_effective_cost = 0.0
             for sample_cost in fuzzy_samples:
-                base_cost = max(1.0, sample_cost - synergy)
+                base_cost = max(1.0, sample_cost - synergy_score)
                 effective_cost = base_cost * funding_penalty
-
-                # Optional: cap runaway cost
                 effective_cost = min(effective_cost, base_cost * 1.5)
-
                 total_effective_cost += effective_cost
 
             avg_cost = total_effective_cost / n_samples
-
-            # Z2: risk-adjusted average effective cost
             Z2 += avg_cost * p['risk']
+            Z3 += synergy_score
 
-            # Z3: aggregate synergy
-            Z3 += synergy
-
-    # Z1: inter-project synergy bonus
-    lambda_val = 2.5
+    # Z1: inter-project synergy weighted by avg λ from both projects
     for i in range(n):
         for j in range(i + 1, n):
             if ind['x'][i] == 1 and ind['x'][j] == 1:
-                Z1 += lambda_val * delta_matrix[i][j]
+                λ_i = benefit_lambda.get(projects[i].get('benefit_group', 'Business Culture'), 1.00)
+                λ_j = benefit_lambda.get(projects[j].get('benefit_group', 'Business Culture'), 1.00)
+                avg_λ = (λ_i + λ_j) / 2
+                Z1 += avg_λ * delta_matrix[i][j]
 
     return [Z1, Z2, Z3]
 

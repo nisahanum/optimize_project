@@ -99,7 +99,14 @@ def plot_results(results):
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
 
+
+    # Save CSV (optional)
+    #df.to_csv("hasil_simulasi_H1_2.csv", index=False)
+    print("✅ Hasil simulasi disimpan ke hasil_simulasi_H1.csv")
+
+
 # === Main Program ===
 if __name__ == "__main__":
     results = run_all_h1_scenarios()
     plot_results(results)
+

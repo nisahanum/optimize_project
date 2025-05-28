@@ -65,7 +65,7 @@ def run_synergy_experiments():
         results.append(result)
 
     df = pd.DataFrame(results)
-    df.to_csv("s1_synergy_tuning_results.csv", index=False)
+    #df.to_csv("s1_synergy_tuning_results_2.csv", index=False)
     print("✅ All results saved to s1_synergy_tuning_results.csv")
 
     # === Optional Visualization ===
