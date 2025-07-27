@@ -20,7 +20,7 @@ def compute_risks(p, w_t=0.6, w_f=0.4):
     p['risk'] = max(0.05, w_t * p['risk_tech'] + w_f * p['risk_fin'])
 
 def run_all_h2_scenarios():
-    h2_scenarios = ["S2.1", "S2.2", "S2.3", "S2.4"]
+    h2_scenarios = ["S2.1", "S2.2", "S2.3", "S2.4", "S2.5", "S2.6"]
     results = []
 
     original_projects = load_project_data()
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     ax[2].set_ylabel('Synergy')
     ax[2].set_ylim(0, df['Z3'].max() + 100)
 
-    plt.suptitle("Hypothesis 2 – Effectiveness of Adaptive Hybrid Funding", fontsize=16)
+    plt.suptitle("Efektivitas Pendanaan Hibrida yang Adaptif", fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
 
