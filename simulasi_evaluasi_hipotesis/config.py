@@ -10,6 +10,14 @@ DIVERSITY_THRESHOLD = 3           # lower barrier to allow more acceptance
 DIVERSITY_ACCEPTANCE_PROB = 0.1   # higher chance of accepting diverse child
 FUNDING_MUTATION_SIGMA = 0.02  # bisa diubah menjadi 0.05 untuk lebih agresif
 
+# risk
+W_TECH = 0.6
+W_FIN  = 0.4
+THETA_CAP = 0.4
+DEFAULT_OUTDIR = "results/cosine_synergy"
+DEFAULT_SYNERGY_PATH = "cleaning_data/synergy_matrix.csv"
+
+
 
 # === Objective Normalization Bounds (Optional) ===
 #Z1_MIN = 0

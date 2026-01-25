@@ -1,0 +1,83 @@
+{
+  "n_projects": 11,
+  "project_ids": [
+    "j3014_9",
+    "j3015_1",
+    "j3015_10",
+    "j3015_2",
+    "j3015_3",
+    "j3015_4",
+    "j3015_5",
+    "j3015_6",
+    "j3015_7",
+    "j3015_8",
+    "j3015_9"
+  ],
+  "risk_baseline": {
+    "w_tech": 0.6,
+    "w_fin": 0.4
+  },
+  "theta_cap": 0.4,
+  "synergy_source": "/Users/nisahanum/Documents/S3/simulationopt/optimize_project/synergy_matrix_cosine_normalized.csv",
+  "synergy_validation": {
+    "n": 11,
+    "symmetric": true,
+    "max_asymmetry": 0.0,
+    "diagonal_zero": false,
+    "diagonal_max_abs": 1.0000000000000002,
+    "min_val": 0.4246784219282863,
+    "max_val": 1.0000000000000002
+  },
+  "funding_sum_issues": [
+    {
+      "id": "j3014_9",
+      "funding_sum": 0.9709999999999999
+    },
+    {
+      "id": "j3015_1",
+      "funding_sum": 0.9730000000000001
+    },
+    {
+      "id": "j3015_10",
+      "funding_sum": 0.996
+    },
+    {
+      "id": "j3015_2",
+      "funding_sum": 0.982
+    },
+    {
+      "id": "j3015_3",
+      "funding_sum": 0.9870000000000001
+    },
+    {
+      "id": "j3015_4",
+      "funding_sum": 0.9790000000000001
+    },
+    {
+      "id": "j3015_5",
+      "funding_sum": 0.9869999999999999
+    },
+    {
+      "id": "j3015_6",
+      "funding_sum": 0.964
+    },
+    {
+      "id": "j3015_7",
+      "funding_sum": 0.993
+    },
+    {
+      "id": "j3015_8",
+      "funding_sum": 0.982
+    },
+    {
+      "id": "j3015_9",
+      "funding_sum": 0.9789999999999999
+    }
+  ],
+  "theta_cap_issues": [],
+  "artifacts": {
+    "projects_json": "/Users/nisahanum/Documents/S3/simulationopt/optimize_project/simulasi_evaluasi_hipotesis/results/step1_cosine/projects.json",
+    "delta_npy": "/Users/nisahanum/Documents/S3/simulationopt/optimize_project/simulasi_evaluasi_hipotesis/results/step1_cosine/delta_matrix.npy",
+    "delta_csv_copy": "/Users/nisahanum/Documents/S3/simulationopt/optimize_project/simulasi_evaluasi_hipotesis/results/step1_cosine/synergy_matrix.csv"
+  }
+}
