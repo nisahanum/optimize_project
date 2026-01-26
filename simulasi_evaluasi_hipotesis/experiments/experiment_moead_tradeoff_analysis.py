@@ -138,5 +138,8 @@ summary = {
     "source_step1": str(step1_dir)
 }
 
+#Extractb Paretto
+
+
 with (outdir / "step2_summary.json").open("w") as f:
     json.dump(summary, f, indent=2)
