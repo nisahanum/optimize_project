@@ -4,10 +4,10 @@ NUM_GENERATIONS = 300
 NEIGHBORHOOD_SIZE = 20
 
 # Enhanced Diversity Settings
-INITIAL_MUTATION_RATE = 0.3       # more aggressive mutation
+INITIAL_MUTATION_RATE = 0.5       # more aggressive mutation
 MIN_MUTATION_RATE = 0.05           # keep mutation alive
 DIVERSITY_THRESHOLD = 3           # lower barrier to allow more acceptance
-DIVERSITY_ACCEPTANCE_PROB = 0.1   # higher chance of accepting diverse child
+DIVERSITY_ACCEPTANCE_PROB = 0.3   # higher chance of accepting diverse child
 FUNDING_MUTATION_SIGMA = 0.02  # bisa diubah menjadi 0.05 untuk lebih agresif
 
 # risk

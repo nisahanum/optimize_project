@@ -16,6 +16,9 @@ import config  # default parameters
 import common_ifpom_final as ifpom
 
 
+# -----------------------------
+# Step 1 loader
+# -----------------------------
 def load_step1(step1_dir: Path) -> Tuple[List[Dict[str, Any]], np.ndarray, Dict[str, Any]]:
     projects_path = step1_dir / "projects.json"
     delta_path = step1_dir / "delta_matrix.npy"
@@ -27,6 +30,53 @@ def load_step1(step1_dir: Path) -> Tuple[List[Dict[str, Any]], np.ndarray, Dict[
     return projects, delta, summary
 
 
+# -----------------------------
+# Pareto utilities (Z1 max, Z2 min, Z3 max)
+# -----------------------------
+def dominates(a: List[float], b: List[float]) -> bool:
+    """
+    Return True if a dominates b under mixed directions:
+      - maximize Z1, Z3
+      - minimize Z2
+    a dominates b if:
+      a is no worse than b on all objectives, and strictly better in at least one.
+    """
+    if a is None or b is None:
+        return False
+
+    no_worse = (a[0] >= b[0]) and (a[1] <= b[1]) and (a[2] >= b[2])
+    strictly_better = (a[0] > b[0]) or (a[1] < b[1]) or (a[2] > b[2])
+    return no_worse and strictly_better
+
+
+def extract_pareto_front(population: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Extract non-dominated individuals from population.
+    Keeps the full individual dict (x + funding + Z) for traceability.
+    """
+    pareto: List[Dict[str, Any]] = []
+    for i, ind in enumerate(population):
+        Zi = ind.get("Z")
+        if Zi is None:
+            continue
+        dominated_flag = False
+        for j, other in enumerate(population):
+            if i == j:
+                continue
+            Zj = other.get("Z")
+            if Zj is None:
+                continue
+            if dominates(Zj, Zi):  # other dominates current
+                dominated_flag = True
+                break
+        if not dominated_flag:
+            pareto.append(ind)
+    return pareto
+
+
+# -----------------------------
+# Main
+# -----------------------------
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--step1", type=str, required=True, help="Path to Step1 output dir (contains projects.json + delta_matrix.npy)")
@@ -67,14 +117,14 @@ def main() -> None:
     # 3) Evaluate initial population + set initial ideal/z_min/z_max
     for ind in population:
         ind["Z"] = ifpom.evaluate_individual(ind, projects, delta)
-        ifpom.update_ideal_point(ind["Z"], ideal_point)  # <-- FIX ORDER
+        ifpom.update_ideal_point(ind["Z"], ideal_point)
 
         for k in range(3):
             z_min[k] = min(z_min[k], ind["Z"][k])
             z_max[k] = max(z_max[k], ind["Z"][k])
 
     # 4) Run MOEA/D
-    log = []
+    log: List[Dict[str, Any]] = []
     for gen in range(max_gen):
         population, ideal_point, z_min, z_max = ifpom.moead_generation(
             population=population,
@@ -90,56 +140,45 @@ def main() -> None:
             theta_cap=theta_cap,
         )
 
-        # light logging every 10 gens
         if gen % 10 == 0 or gen == max_gen - 1:
             log.append({"gen": gen, "ideal_point": ideal_point, "z_min": z_min, "z_max": z_max})
             print(f"Gen {gen:03d} | ideal(Z1,Z2,Z3)=({ideal_point[0]:.3f},{ideal_point[1]:.3f},{ideal_point[2]:.3f})")
 
-    # 5) Export
+    # 5) Extract Pareto
+    pareto = extract_pareto_front(population)
+
+    # 6) Export artifacts (Step-2 reproducible outputs)
     (outdir / "final_population.json").write_text(json.dumps(population, ensure_ascii=False, indent=2), encoding="utf-8")
+    (outdir / "pareto_solutions.json").write_text(json.dumps(pareto, ensure_ascii=False, indent=2), encoding="utf-8")
     (outdir / "convergence_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
     (outdir / "step1_summary_copy.json").write_text(json.dumps(step1_summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    step2_summary = {
+        "algorithm": "MOEA/D",
+        "pop_size": pop_size,
+        "generations": max_gen,
+        "neighbors_T": T,
+        "theta_cap": theta_cap,
+        "final_ideal_point": ideal_point,
+        "z_min_final": z_min,
+        "z_max_final": z_max,
+        "n_projects": n_projects,
+        "n_population": len(population),
+        "n_pareto": len(pareto),
+        "source_step1_dir": str(step1_dir),
+        "saved_files": {
+            "final_population": "final_population.json",
+            "pareto_solutions": "pareto_solutions.json",
+            "convergence_log": "convergence_log.json",
+            "step1_summary_copy": "step1_summary_copy.json",
+        },
+    }
+    (outdir / "step2_summary.json").write_text(json.dumps(step2_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print("=== Step 2 Completed: MOEA/D finished ===")
     print(f"Saved: {outdir}")
+    print(f"Pareto solutions: {len(pareto)}  -> {outdir / 'pareto_solutions.json'}")
 
 
 if __name__ == "__main__":
     main()
-
-# === SAVE STEP 2 ARTIFACTS ===
-
-outdir.mkdir(parents=True, exist_ok=True)
-
-# 1) Final population
-with (outdir / "final_population.json").open("w") as f:
-    json.dump(population, f, indent=2)
-
-# 2) Pareto solutions
-pareto = ifpom.extract_pareto_front(population)
-with (outdir / "pareto_solutions.json").open("w") as f:
-    json.dump(pareto, f, indent=2)
-
-# 3) Convergence log
-with (outdir / "convergence_log.csv").open("w") as f:
-    f.write("generation,Z1_best,Z2_best,Z3_best\n")
-    for g, (z1, z2, z3) in convergence_log:
-        f.write(f"{g},{z1},{z2},{z3}\n")
-
-# 4) Summary
-summary = {
-    "algorithm": "MOEA/D",
-    "population": pop_size,
-    "generations": max_gen,
-    "neighbors": n_neighbors,
-    "risk_weights": {"w_tech": w_tech, "w_fin": w_fin},
-    "theta_cap": theta_cap,
-    "best_ideal_point": ideal_point,
-    "source_step1": str(step1_dir)
-}
-
-#Extractb Paretto
-
-
-with (outdir / "step2_summary.json").open("w") as f:
-    json.dump(summary, f, indent=2)

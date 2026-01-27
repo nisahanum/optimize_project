@@ -1,0 +1,32 @@
+{
+  "algorithm": "MOEA/D",
+  "pop_size": 100,
+  "generations": 300,
+  "neighbors_T": 20,
+  "theta_cap": 0.4,
+  "final_ideal_point": [
+    1496.2499669763286,
+    0.32784147199999997,
+    931.5099999999998
+  ],
+  "z_min_final": [
+    114.9346016,
+    0.32784147199999997,
+    87.44
+  ],
+  "z_max_final": [
+    1496.2499669763286,
+    3.680097996,
+    931.5099999999998
+  ],
+  "n_projects": 11,
+  "n_population": 100,
+  "n_pareto": 100,
+  "source_step1_dir": "/Users/nisahanum/Documents/S3/simulationopt/optimize_project/simulasi_evaluasi_hipotesis/results/step1_cosine",
+  "saved_files": {
+    "final_population": "final_population.json",
+    "pareto_solutions": "pareto_solutions.json",
+    "convergence_log": "convergence_log.json",
+    "step1_summary_copy": "step1_summary_copy.json"
+  }
+}

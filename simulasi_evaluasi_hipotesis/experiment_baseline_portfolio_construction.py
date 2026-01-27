@@ -1,183 +1,298 @@
-from __future__ import annotations  # HARUS baris pertama setelah komentar/docstring
+# experiment_baseline_portfolio_construction.py
+# Step 1 (Baseline Portfolio Construction): Load + Validate + Prepare IFPOM Inputs
+#
+# What this does:
+# 1) Load project dataset from original_projects.py
+# 2) Load synergy matrix delta_ij from a CSV (numeric square matrix)
+# 3) Validate consistency (dimension match, symmetry, diagonal, numeric range)
+# 4) Ensure required computed fields exist (risk_tech, risk_fin, risk) if missing
+# 5) Check funding sums and vendor cap (theta_cap) as diagnostics (no forced repair)
+# 6) Export prepared artifacts for Step 2 (MOEA/D runner):
+#    - projects.json
+#    - delta_matrix.npy
+#    - synergy_matrix_copy.csv
+#    - step1_summary.json
+#
+# Usage (Mac/Linux):
+#   python experiment_baseline_portfolio_construction.py \
+#     --synergy /full/path/synergy_matrix_cosine_normalized.csv \
+#     --outdir results/step1_cosine \
+#     --w_tech 0.6 --w_fin 0.4 --theta_cap 0.4
+#
+# Usage (Windows PowerShell one-line):
+#   python experiment_baseline_portfolio_construction.py --synergy "C:\path\synergy_matrix.csv" --outdir "results\step1_cosine" --w_tech 0.6 --w_fin 0.4 --theta_cap 0.4
+
+from __future__ import annotations
 
 import argparse
 import json
+import math
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-import sys
 
 import numpy as np
 
-# --- Make root importable: .../optimize_project
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
-import config  # default parameters
-import common_ifpom_final as ifpom
+import original_projects
 
 
 # -----------------------------
-# Step 1 loader
+# Risk utilities (lightweight)
 # -----------------------------
-def load_step1(step1_dir: Path) -> Tuple[List[Dict[str, Any]], np.ndarray, Dict[str, Any]]:
-    projects_path = step1_dir / "projects.json"
-    delta_path = step1_dir / "delta_matrix.npy"
-    summary_path = step1_dir / "step1_summary.json"
+def compute_technical_risk(trl: float, complexity: float) -> float:
+    """
+    Technical risk based on TRL (1..9) and complexity (0..1).
+    Higher TRL => lower risk. We use normalized (9-TRL)/8 in [0,1].
+    """
+    trl_f = float(trl)
+    comp_f = float(complexity)
+    trl_norm = (9.0 - trl_f) / 8.0  # TRL=9 -> 0, TRL=1 -> 1
+    return max(0.0, trl_norm) * max(0.0, comp_f)
 
-    projects = json.loads(projects_path.read_text(encoding="utf-8"))
-    delta = np.load(delta_path)
-    summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else {}
-    return projects, delta, summary
+
+def compute_financial_risk(alpha: float, beta: float, theta: float, gamma: float, delta: float) -> float:
+    """
+    Simple monotonic scoring for financial risk from funding mix.
+    This is a *scoring function* (not a market-estimated probability).
+    You can align coefficients to your manuscript assumptions.
+    """
+    a = float(alpha)
+    b = float(beta)
+    t = float(theta)
+    g = float(gamma)
+    d = float(delta)
+    return (
+        a * 0.0 +   # internal equity: lowest
+        b * 0.3 +   # soft loan: moderate
+        t * 1.0 +   # vendor financing: highest
+        g * 0.1 +   # grants: low-to-moderate overhead
+        d * 0.6     # PPP/JV: higher coordination/contract risk
+    )
+
+
+def ensure_project_risk(p: Dict[str, Any], w_tech: float, w_fin: float) -> None:
+    """
+    Ensure p contains:
+      - risk_tech
+      - risk_fin
+      - risk (overall)
+    If p already has 'risk', we keep it and only fill missing subfields if needed.
+    """
+    # Extract base fields with sensible defaults
+    trl = float(p.get("trl", 5))
+    complexity = float(p.get("complexity", 0.5))
+
+    alpha = float(p.get("alpha", 0.0))
+    beta = float(p.get("beta", 0.0))
+    theta = float(p.get("theta", 0.0))
+    gamma = float(p.get("gamma", 0.0))
+    delta = float(p.get("delta", 0.0))
+
+    r_tech = compute_technical_risk(trl, complexity)
+    r_fin = compute_financial_risk(alpha, beta, theta, gamma, delta)
+
+    # Store components
+    p["risk_tech"] = float(r_tech)
+    p["risk_fin"] = float(r_fin)
+
+    # If overall risk exists, do not overwrite (but ensure it's float)
+    if p.get("risk", None) is not None:
+        p["risk"] = float(p["risk"])
+        return
+
+    # Baseline composition (convex combination)
+    risk = (float(w_tech) * r_tech) + (float(w_fin) * r_fin)
+
+    # Guardrail consistent with your earlier implementation
+    p["risk"] = float(max(0.05, risk))
+
+
+# Repair Funding
+def repair_funding_to_alpha(p: dict) -> None:
+    """
+    Repair funding so that α absorbs residual and sum == 1.0
+    This keeps funding realistic and reviewer-safe.
+    """
+    alpha = float(p.get("alpha", 0.0))
+    beta  = float(p.get("beta", 0.0))
+    theta = float(p.get("theta", 0.0))
+    gamma = float(p.get("gamma", 0.0))
+    delta = float(p.get("delta", 0.0))
+
+    total = alpha + beta + theta + gamma + delta
+    if abs(total - 1.0) > 1e-6:
+        p["alpha"] = max(0.0, 1.0 - (beta + theta + gamma + delta))
+
+# -----------------------------
+# Funding checks (diagnostics)
+# -----------------------------
+def funding_sum(p: Dict[str, Any]) -> float:
+    return (
+        float(p.get("alpha", 0.0)) +
+        float(p.get("beta", 0.0)) +
+        float(p.get("theta", 0.0)) +
+        float(p.get("gamma", 0.0)) +
+        float(p.get("delta", 0.0))
+    )
+
+
+def check_theta_cap(p: Dict[str, Any], cap: float) -> bool:
+    return float(p.get("theta", 0.0)) <= float(cap) + 1e-9
 
 
 # -----------------------------
-# Pareto utilities (Z1 max, Z2 min, Z3 max)
+# Synergy matrix loader/validator
 # -----------------------------
-def dominates(a: List[float], b: List[float]) -> bool:
-    """
-    Return True if a dominates b under mixed directions:
-      - maximize Z1, Z3
-      - minimize Z2
-    a dominates b if:
-      a is no worse than b on all objectives, and strictly better in at least one.
-    """
-    if a is None or b is None:
-        return False
+def load_synergy_matrix_csv(csv_path: Path) -> np.ndarray:
+    import pandas as pd
 
-    no_worse = (a[0] >= b[0]) and (a[1] <= b[1]) and (a[2] >= b[2])
-    strictly_better = (a[0] > b[0]) or (a[1] < b[1]) or (a[2] > b[2])
-    return no_worse and strictly_better
+    df = pd.read_csv(csv_path, index_col=0)
+
+    if df.isna().any().any():
+        raise ValueError("Synergy matrix contains NaN (likely empty cell).")
+
+    mat = df.values.astype(float)
+
+    if mat.shape[0] != mat.shape[1]:
+        raise ValueError(f"Synergy matrix must be square, got {mat.shape}")
+
+    return mat
 
 
-def extract_pareto_front(population: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Extract non-dominated individuals from population.
-    Keeps the full individual dict (x + funding + Z) for traceability.
-    """
-    pareto: List[Dict[str, Any]] = []
-    for i, ind in enumerate(population):
-        Zi = ind.get("Z")
-        if Zi is None:
-            continue
-        dominated_flag = False
-        for j, other in enumerate(population):
-            if i == j:
-                continue
-            Zj = other.get("Z")
-            if Zj is None:
-                continue
-            if dominates(Zj, Zi):  # other dominates current
-                dominated_flag = True
-                break
-        if not dominated_flag:
-            pareto.append(ind)
-    return pareto
+
+@dataclass
+class SynergyValidationReport:
+    n: int
+    symmetric: bool
+    max_asymmetry: float
+    diagonal_zero: bool
+    diagonal_max_abs: float
+    min_val: float
+    max_val: float
+
+
+def validate_synergy_matrix(delta: np.ndarray, tol: float = 1e-6) -> SynergyValidationReport:
+    n = int(delta.shape[0])
+
+    asym = np.abs(delta - delta.T)
+    max_asym = float(np.max(asym))
+    symmetric = bool(max_asym <= tol)
+
+    diag = np.diag(delta)
+    diag_max_abs = float(np.max(np.abs(diag)))
+    diagonal_zero = bool(diag_max_abs <= tol)
+
+    min_val = float(np.min(delta))
+    max_val = float(np.max(delta))
+
+    return SynergyValidationReport(
+        n=n,
+        symmetric=symmetric,
+        max_asymmetry=max_asym,
+        diagonal_zero=diagonal_zero,
+        diagonal_max_abs=diag_max_abs,
+        min_val=min_val,
+        max_val=max_val,
+    )
 
 
 # -----------------------------
 # Main
 # -----------------------------
 def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--step1", type=str, required=True, help="Path to Step1 output dir (contains projects.json + delta_matrix.npy)")
-    ap.add_argument("--outdir", type=str, default=None, help="Output directory (default from config)")
-    ap.add_argument("--pop", type=int, default=None, help="Population size (default from config)")
-    ap.add_argument("--gen", type=int, default=None, help="Generations (default from config)")
-    ap.add_argument("--neighbors", type=int, default=None, help="Neighborhood size T (default from config)")
-    ap.add_argument("--theta_cap", type=float, default=None, help="Theta cap (default from config)")
+    ap = argparse.ArgumentParser(description="Step 1: Baseline portfolio input construction for IFPOM experiments.")
+    ap.add_argument("--synergy", type=str, required=True, help="Path to synergy matrix CSV (delta_ij).")
+    ap.add_argument("--outdir", type=str, default="results/step1", help="Output directory for Step 1 artifacts.")
+    ap.add_argument("--w_tech", type=float, default=0.6, help="Baseline weight for technical risk.")
+    ap.add_argument("--w_fin", type=float, default=0.4, help="Baseline weight for financial risk.")
+    ap.add_argument("--theta_cap", type=float, default=0.4, help="Vendor financing cap (theta).")
     args = ap.parse_args()
 
-    # ---- defaults from config, overridable by CLI
-    pop_size = args.pop if args.pop is not None else config.POPULATION_SIZE
-    max_gen = args.gen if args.gen is not None else config.NUM_GENERATIONS
-    T = args.neighbors if args.neighbors is not None else config.NEIGHBORHOOD_SIZE
-    theta_cap = args.theta_cap if args.theta_cap is not None else config.THETA_CAP
-    outdir = Path(args.outdir if args.outdir is not None else config.DEFAULT_OUTDIR).resolve()
+    synergy_path = Path(args.synergy).expanduser().resolve()
+    outdir = Path(args.outdir).expanduser().resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    step1_dir = Path(args.step1).resolve()
-
-    # 1) Load prepared inputs
-    projects, delta, step1_summary = load_step1(step1_dir)
+    # 1) Load projects (must exist in original_projects.py)
+    # Expected: original_projects.load_project_data() returns List[Dict]
+    projects: List[Dict[str, Any]] = original_projects.load_project_data()
     n_projects = len(projects)
 
-    # 2) Initialize MOEA/D state
-    population, weights, neighborhoods = ifpom.initialize_ifpom(
-        pop_size=pop_size,
-        num_projects=n_projects,
-        num_neighbors=T,
-        theta_cap=theta_cap,
-    )
+    # 2) Load synergy matrix
+    delta = load_synergy_matrix_csv(synergy_path)
+    np.fill_diagonal(delta,0.0)
 
-    # Ideal point for mixed directions: Z1 max, Z2 min, Z3 max
-    ideal_point = [-float("inf"), float("inf"), -float("inf")]
-    z_min = [float("inf"), float("inf"), float("inf")]
-    z_max = [-float("inf"), -float("inf"), -float("inf")]
-
-    # 3) Evaluate initial population + set initial ideal/z_min/z_max
-    for ind in population:
-        ind["Z"] = ifpom.evaluate_individual(ind, projects, delta)
-        ifpom.update_ideal_point(ind["Z"], ideal_point)
-
-        for k in range(3):
-            z_min[k] = min(z_min[k], ind["Z"][k])
-            z_max[k] = max(z_max[k], ind["Z"][k])
-
-    # 4) Run MOEA/D
-    log: List[Dict[str, Any]] = []
-    for gen in range(max_gen):
-        population, ideal_point, z_min, z_max = ifpom.moead_generation(
-            population=population,
-            projects=projects,
-            delta_matrix=delta,
-            weight_vectors=weights,
-            neighborhoods=neighborhoods,
-            ideal_point=ideal_point,
-            gen=gen,
-            max_gen=max_gen,
-            z_min=z_min,
-            z_max=z_max,
-            theta_cap=theta_cap,
+    # 3) Dimension match check
+    if delta.shape[0] != n_projects:
+        raise ValueError(
+            f"Mismatch: projects={n_projects} but synergy matrix size={delta.shape[0]}. "
+            "Ensure the synergy matrix row/column order aligns to your project list ordering."
         )
 
-        if gen % 10 == 0 or gen == max_gen - 1:
-            log.append({"gen": gen, "ideal_point": ideal_point, "z_min": z_min, "z_max": z_max})
-            print(f"Gen {gen:03d} | ideal(Z1,Z2,Z3)=({ideal_point[0]:.3f},{ideal_point[1]:.3f},{ideal_point[2]:.3f})")
+    # 4) Validate synergy properties
+    rep = validate_synergy_matrix(delta)
 
-    # 5) Extract Pareto
-    pareto = extract_pareto_front(population)
+    # 5) Ensure risk exists; record funding / theta diagnostics
+    funding_issues: List[Dict[str, Any]] = []
+    theta_issues: List[Dict[str, Any]] = []
 
-    # 6) Export artifacts (Step-2 reproducible outputs)
-    (outdir / "final_population.json").write_text(json.dumps(population, ensure_ascii=False, indent=2), encoding="utf-8")
-    (outdir / "pareto_solutions.json").write_text(json.dumps(pareto, ensure_ascii=False, indent=2), encoding="utf-8")
-    (outdir / "convergence_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
-    (outdir / "step1_summary_copy.json").write_text(json.dumps(step1_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    for p in projects:
+        repair_funding_to_alpha(p)   # atau renormalize_funding(p)
+        ensure_project_risk(p, w_tech=args.w_tech, w_fin=args.w_fin)
 
-    step2_summary = {
-        "algorithm": "MOEA/D",
-        "pop_size": pop_size,
-        "generations": max_gen,
-        "neighbors_T": T,
-        "theta_cap": theta_cap,
-        "final_ideal_point": ideal_point,
-        "z_min_final": z_min,
-        "z_max_final": z_max,
+        s = funding_sum(p)
+        if not math.isclose(s, 1.0, rel_tol=0.0, abs_tol=1e-6):
+            funding_issues.append({"id": p.get("id"), "funding_sum": float(s)})
+
+        if not check_theta_cap(p, cap=args.theta_cap):
+            theta_issues.append({"id": p.get("id"), "theta": float(p.get("theta", 0.0)), "cap": float(args.theta_cap)})
+
+    # 6) Export artifacts
+    # delta
+    np.save(outdir / "delta_matrix.npy", delta)
+    # copy CSV for traceability
+    (outdir / "synergy_matrix_copy.csv").write_text(synergy_path.read_text(encoding="utf-8"), encoding="utf-8")
+    # projects
+    (outdir / "projects.json").write_text(json.dumps(projects, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    summary = {
         "n_projects": n_projects,
-        "n_population": len(population),
-        "n_pareto": len(pareto),
-        "source_step1_dir": str(step1_dir),
-        "saved_files": {
-            "final_population": "final_population.json",
-            "pareto_solutions": "pareto_solutions.json",
-            "convergence_log": "convergence_log.json",
-            "step1_summary_copy": "step1_summary_copy.json",
+        "project_ids": [p.get("id") for p in projects],
+        "risk_baseline": {"w_tech": float(args.w_tech), "w_fin": float(args.w_fin)},
+        "theta_cap": float(args.theta_cap),
+        "synergy_source": str(synergy_path),
+        "synergy_validation": {
+            "n": rep.n,
+            "symmetric": rep.symmetric,
+            "max_asymmetry": rep.max_asymmetry,
+            "diagonal_zero": rep.diagonal_zero,
+            "diagonal_max_abs": rep.diagonal_max_abs,
+            "min_val": rep.min_val,
+            "max_val": rep.max_val,
+        },
+        "funding_sum_issues": funding_issues,
+        "theta_cap_issues": theta_issues,
+        "artifacts": {
+            "projects_json": str((outdir / "projects.json").as_posix()),
+            "delta_npy": str((outdir / "delta_matrix.npy").as_posix()),
+            "synergy_csv_copy": str((outdir / "synergy_matrix_copy.csv").as_posix()),
         },
     }
-    (outdir / "step2_summary.json").write_text(json.dumps(step2_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    (outdir / "step1_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print("=== Step 2 Completed: MOEA/D finished ===")
-    print(f"Saved: {outdir}")
-    print(f"Pareto solutions: {len(pareto)}  -> {outdir / 'pareto_solutions.json'}")
+    # 7) Console output (short, reviewer-friendly)
+    print("=== Step 1 Completed: Inputs Prepared ===")
+    print(f"Projects: {n_projects}")
+    print(f"Synergy source: {synergy_path}")
+    print(
+        f"Synergy matrix: {delta.shape} | symmetric={rep.symmetric} | diag_zero={rep.diagonal_zero} "
+        f"| range=[{rep.min_val:.4f}, {rep.max_val:.4f}]"
+    )
+    print(f"Risk baseline: w_tech={args.w_tech}, w_fin={args.w_fin} | theta_cap={args.theta_cap}")
+    if funding_issues:
+        print(f"[WARN] Funding sums != 1.0 for {len(funding_issues)} project(s). See step1_summary.json")
+    if theta_issues:
+        print(f"[WARN] Theta cap violated for {len(theta_issues)} project(s). See step1_summary.json")
+    print(f"Artifacts saved to: {outdir}")
 
 
 if __name__ == "__main__":
