@@ -100,10 +100,9 @@ def main() -> None:
     if not step1_dir.is_absolute():
         step1_dir = (ROOT / step1_dir).resolve()
 
-    outdir = Path(args.outdir) if args.outdir else Path(config.DEFAULT_OUTDIR)
-    if not outdir.is_absolute():
-        outdir = (ROOT / outdir).resolve()
+    outdir = Path(args.outdir if args.outdir else config.DEFAULT_OUTDIR).expanduser().resolve()
     outdir.mkdir(parents=True, exist_ok=True)
+
 
     # 1) Load prepared inputs
     projects, delta, step1_summary = load_step1(step1_dir)
