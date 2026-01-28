@@ -21,19 +21,23 @@
 #
 # Usage (Windows PowerShell one-line):
 #   python experiment_baseline_portfolio_construction.py --synergy "C:\path\synergy_matrix.csv" --outdir "results\step1_cosine" --w_tech 0.6 --w_fin 0.4 --theta_cap 0.4
-
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]  # simulasi_evaluasi_hipotesis
+sys.path.insert(0, str(ROOT))
 
 import argparse
 import json
 import math
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 
-from simulasi_evaluasi_hipotesis import original_projects
+import original_projects
 
 
 # -----------------------------

@@ -1,0 +1,32 @@
+{
+  "algorithm": "MOEA/D",
+  "pop_size": 100,
+  "generations": 300,
+  "neighbors_T": 20,
+  "theta_cap": 0.4,
+  "final_ideal_point": [
+    1387.9589869094646,
+    0.27576223217562323,
+    113.2813894047288
+  ],
+  "z_min_final": [
+    100.834964,
+    0.27576223217562323,
+    7.253849081494596
+  ],
+  "z_max_final": [
+    1387.9589869094646,
+    3.464581831819424,
+    113.2813894047288
+  ],
+  "n_projects": 11,
+  "n_population": 100,
+  "n_pareto": 22,
+  "source_step1_dir": "C:\\Users\\nisahanum\\Documents\\cobagit\\optimize_project\\simulasi_evaluasi_hipotesis\\results\\step1_cosine",
+  "saved_files": {
+    "final_population": "final_population.json",
+    "pareto_solutions": "pareto_solutions.json",
+    "convergence_log": "convergence_log.json",
+    "step1_summary_copy": "step1_summary_copy.json"
+  }
+}
