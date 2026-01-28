@@ -12,6 +12,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+
 import config  # default parameters
 import common_ifpom_final as ifpom
 
@@ -79,12 +80,12 @@ def extract_pareto_front(population: List[Dict[str, Any]]) -> List[Dict[str, Any
 # -----------------------------
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--step1", type=str, required=True, help="Path to Step1 output dir (contains projects.json + delta_matrix.npy)")
-    ap.add_argument("--outdir", type=str, default=None, help="Output directory (default from config)")
     ap.add_argument("--pop", type=int, default=None, help="Population size (default from config)")
     ap.add_argument("--gen", type=int, default=None, help="Generations (default from config)")
     ap.add_argument("--neighbors", type=int, default=None, help="Neighborhood size T (default from config)")
     ap.add_argument("--theta_cap", type=float, default=None, help="Theta cap (default from config)")
+    ap.add_argument("--step1", required=True)
+    ap.add_argument("--outdir", default=None)
     args = ap.parse_args()
 
     # ---- defaults from config, overridable by CLI
@@ -92,10 +93,17 @@ def main() -> None:
     max_gen = args.gen if args.gen is not None else config.NUM_GENERATIONS
     T = args.neighbors if args.neighbors is not None else config.NEIGHBORHOOD_SIZE
     theta_cap = args.theta_cap if args.theta_cap is not None else config.THETA_CAP
-    outdir = Path(args.outdir if args.outdir is not None else config.DEFAULT_OUTDIR).resolve()
+    outdir = Path(args.outdir if args.outdir else config.DEFAULT_OUTDIR).expanduser().resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
-    step1_dir = Path(args.step1).resolve()
+    step1_dir = Path(args.step1).expanduser().resolve()
+    if not step1_dir.is_absolute():
+        step1_dir = (ROOT / step1_dir).resolve()
+
+    outdir = Path(args.outdir) if args.outdir else Path(config.DEFAULT_OUTDIR)
+    if not outdir.is_absolute():
+        outdir = (ROOT / outdir).resolve()
+    outdir.mkdir(parents=True, exist_ok=True)
 
     # 1) Load prepared inputs
     projects, delta, step1_summary = load_step1(step1_dir)
