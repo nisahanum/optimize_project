@@ -88,7 +88,10 @@ def evaluate_individual(
         Z1 += (svs + λ_b * synergy_score) * (1.0 - risk)
 
         # Z3: Total synergy proxy (reported separately)
-        Z3 += synergy_score
+        # Encourage portfolio-level interaction, not just additive synergy
+        Z3 += np.sqrt(max(0.0, synergy_score)) * (1.0 - 0.5 * risk)
+
+
 
         # ---- Z2: fuzzy-cost sampling (triangular) with synergy discount + funding penalty
         c1, c2, c3 = p["fuzzy_cost"]
@@ -136,7 +139,9 @@ def evaluate_individual(
                 continue
             λ_j = float(benefit_lambda.get(projects[j].get("benefit_group", "Business Culture"), 1.0))
             avg_λ = 0.5 * (λ_i + λ_j)
-            Z1 += avg_λ * float(delta_matrix[i, j])
+            delta_ij = float(delta_matrix[i, j])
+            Z1 += avg_λ * delta_ij
+            Z3 += delta_ij
 
     return [Z1, Z2, Z3]
 
@@ -278,8 +283,10 @@ def moead_generation(
             if random.random() < mutation_prob:
                 child["x"][m] = 1 - child["x"][m]
 
-        if sum(child["x"]) == 0:
-            child["x"][random.randint(0, n - 1)] = 1
+        if sum(child["x"]) == 0 or sum(child["x"]) == n:
+            k = random.randint(1, max(1, n // 2))
+            idx = random.sample(range(n), k)
+            child["x"] = [1 if i in idx else 0 for i in range(n)]
 
         # --- Mutate funding ratios for selected projects only
         for m in range(n):

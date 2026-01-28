@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-import original_projects
+from simulasi_evaluasi_hipotesis import original_projects
 
 
 # -----------------------------
@@ -143,7 +143,7 @@ def check_theta_cap(p: Dict[str, Any], cap: float) -> bool:
 # -----------------------------
 # Synergy matrix loader/validator
 # -----------------------------
-def load_synergy_matrix_csv(csv_path: Path) -> np.ndarray:
+def load_synergy_matrix_csv(csv_path: Path, project_ids: List[Any]) -> np.ndarray:
     import pandas as pd
 
     df = pd.read_csv(csv_path, index_col=0)
@@ -151,8 +151,24 @@ def load_synergy_matrix_csv(csv_path: Path) -> np.ndarray:
     if df.isna().any().any():
         raise ValueError("Synergy matrix contains NaN (likely empty cell).")
 
-    mat = df.values.astype(float)
+    # pastikan label kolom & index ada
+    df.index = df.index.astype(str)
+    df.columns = df.columns.astype(str)
 
+    pid = [str(x) for x in project_ids]
+
+    missing_rows = [x for x in pid if x not in df.index]
+    missing_cols = [x for x in pid if x not in df.columns]
+    if missing_rows or missing_cols:
+        raise ValueError(
+            f"Synergy CSV labels do not match project ids. "
+            f"Missing rows={missing_rows[:5]} cols={missing_cols[:5]} (showing up to 5)."
+        )
+
+    # REINDEX sesuai urutan proyek
+    df = df.loc[pid, pid]
+
+    mat = df.values.astype(float)
     if mat.shape[0] != mat.shape[1]:
         raise ValueError(f"Synergy matrix must be square, got {mat.shape}")
 
@@ -206,6 +222,8 @@ def main() -> None:
     ap.add_argument("--w_tech", type=float, default=0.6, help="Baseline weight for technical risk.")
     ap.add_argument("--w_fin", type=float, default=0.4, help="Baseline weight for financial risk.")
     ap.add_argument("--theta_cap", type=float, default=0.4, help="Vendor financing cap (theta).")
+    ap.add_argument("--repair_funding", action="store_true",
+               help="If set, repair funding so alpha absorbs residual and sum==1. Default: diagnostics only.")
     args = ap.parse_args()
 
     synergy_path = Path(args.synergy).expanduser().resolve()
@@ -218,8 +236,9 @@ def main() -> None:
     n_projects = len(projects)
 
     # 2) Load synergy matrix
-    delta = load_synergy_matrix_csv(synergy_path)
-    np.fill_diagonal(delta,0.0)
+    project_ids = [p.get("id") for p in projects]
+    delta = load_synergy_matrix_csv(synergy_path, project_ids=project_ids)
+    np.fill_diagonal(delta, 0.0)
 
     # 3) Dimension match check
     if delta.shape[0] != n_projects:
@@ -236,7 +255,8 @@ def main() -> None:
     theta_issues: List[Dict[str, Any]] = []
 
     for p in projects:
-        repair_funding_to_alpha(p)   # atau renormalize_funding(p)
+        if args.repair_funding:
+            repair_funding_to_alpha(p)   # atau renormalize_funding(p)
         ensure_project_risk(p, w_tech=args.w_tech, w_fin=args.w_fin)
 
         s = funding_sum(p)
@@ -270,6 +290,7 @@ def main() -> None:
             "max_val": rep.max_val,
         },
         "funding_sum_issues": funding_issues,
+        "repair_funding_enabled": bool(args.repair_funding),
         "theta_cap_issues": theta_issues,
         "artifacts": {
             "projects_json": str((outdir / "projects.json").as_posix()),
