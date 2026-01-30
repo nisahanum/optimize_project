@@ -16,6 +16,32 @@ sys.path.insert(0, str(ROOT))
 import config  # default parameters
 import common_ifpom_final as ifpom
 
+def export_full_ifpom_like_B0(
+    outdir: Path,
+    population: List[Dict[str, Any]],
+    pareto: List[Dict[str, Any]],
+    meta: Dict[str, Any],
+    filename: str = "Full_IFPOM.json",
+) -> Path:
+    """
+    Export Full IFPOM in a compact structure compatible with B0/B1/B2 outputs,
+    so it can be visualized/split in the same pipeline.
+    """
+    payload = {
+        "model": "Full_IFPOM",
+        "objectives": ["Z1", "Z2", "Z3"],
+        "directions": ["max", "min", "max"],
+        "population": [{"x": ind.get("x"), "Z": ind.get("Z")} for ind in population if ind.get("Z") is not None],
+        "pareto": [{"x": ind.get("x"), "Z": ind.get("Z")} for ind in pareto if ind.get("Z") is not None],
+        "summary": meta,
+    }
+    out_path = outdir / filename
+    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out_path
+
+
+
+
 
 # -----------------------------
 # Step 1 loader
@@ -101,6 +127,7 @@ def main() -> None:
         step1_dir = (ROOT / step1_dir).resolve()
 
     outdir = Path(args.outdir if args.outdir else config.DEFAULT_OUTDIR).expanduser().resolve()
+    outdir = Path(args.outdir if args.outdir else config.DEFAULT_OUTDIR).expanduser().resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
 
@@ -155,10 +182,6 @@ def main() -> None:
     pareto = extract_pareto_front(population)
 
     # 6) Export artifacts (Step-2 reproducible outputs)
-    (outdir / "final_population.json").write_text(json.dumps(population, ensure_ascii=False, indent=2), encoding="utf-8")
-    (outdir / "pareto_solutions.json").write_text(json.dumps(pareto, ensure_ascii=False, indent=2), encoding="utf-8")
-    (outdir / "convergence_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
-    (outdir / "step1_summary_copy.json").write_text(json.dumps(step1_summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
     step2_summary = {
         "algorithm": "MOEA/D",
@@ -180,8 +203,32 @@ def main() -> None:
             "step1_summary_copy": "step1_summary_copy.json",
         },
     }
+
+
+    (outdir / "final_population.json").write_text(json.dumps(population, ensure_ascii=False, indent=2), encoding="utf-8")
+    (outdir / "pareto_solutions.json").write_text(json.dumps(pareto, ensure_ascii=False, indent=2), encoding="utf-8")
+    (outdir / "convergence_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
+    (outdir / "step1_summary_copy.json").write_text(json.dumps(step1_summary, ensure_ascii=False, indent=2), encoding="utf-8")
     (outdir / "step2_summary.json").write_text(json.dumps(step2_summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    
+    # 7) Extra export: Full IFPOM in the SAME structure style as B0/B1/B2
+    #    (for reviewer #4 ablation comparison + easy visualization/splitting)
+    full_like_b0_meta = {
+        "algorithm": "MOEA/D",
+        "pop_size": pop_size,
+        "generations": max_gen,
+        "neighbors_T": T,
+        "theta_cap": theta_cap,
+        "source_step1_dir": str(step1_dir),
+        "n_population": len(population),
+        "n_pareto": len(pareto),
+        "final_ideal_point": ideal_point,
+        "z_min_final": z_min,
+        "z_max_final": z_max,
+    }
+    export_full_ifpom_like_B0(outdir=outdir, population=population, pareto=pareto, meta=full_like_b0_meta)
+   
     print("=== Step 2 Completed: MOEA/D finished ===")
     print(f"Saved: {outdir}")
     print(f"Pareto solutions: {len(pareto)}  -> {outdir / 'pareto_solutions.json'}")

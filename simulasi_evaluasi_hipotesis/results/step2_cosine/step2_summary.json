@@ -21,8 +21,8 @@
   ],
   "n_projects": 11,
   "n_population": 100,
-  "n_pareto": 59,
-  "source_step1_dir": "C:\\Users\\nisahanum\\Documents\\cobagit\\optimize_project\\simulasi_evaluasi_hipotesis\\results\\step1_cosine",
+  "n_pareto": 100,
+  "source_step1_dir": "/Users/nisahanum/Documents/S3/simulationopt/optimize_project/simulasi_evaluasi_hipotesis/results/step1_cosine",
   "saved_files": {
     "final_population": "final_population.json",
     "pareto_solutions": "pareto_solutions.json",
